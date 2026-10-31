@@ -1,4 +1,4 @@
-var CACHE_NAME = "octopus-shell-v1";
+var CACHE_NAME = "octopus-shell-v2";
 var PRECACHE_URLS = [
   "./",
   "./index.html",
@@ -29,13 +29,24 @@ self.addEventListener("activate", function(event){
 });
 
 self.addEventListener("fetch", function(event){
-  if(event.request.method !== "GET") return;
+  var req = event.request;
+  if(req.method !== "GET") return;
+
+  var isNavigation = req.mode === "navigate";
+  // Only handle the app shell itself and the precached CDN scripts.
+  // Everything else (Firestore, Storage, Auth, any other API call) must
+  // pass straight through untouched, or Firebase's own offline/retry
+  // handling breaks.
+  if(!isNavigation && PRECACHE_URLS.indexOf(req.url) === -1) return;
+
+  var cacheKey = isNavigation ? "./index.html" : req;
+
   event.respondWith(
-    caches.match(event.request).then(function(cached){
-      var fetchPromise = fetch(event.request).then(function(response){
+    caches.match(cacheKey).then(function(cached){
+      var fetchPromise = fetch(req).then(function(response){
         if(response && response.status === 200){
           var copy = response.clone();
-          caches.open(CACHE_NAME).then(function(cache){ cache.put(event.request, copy); });
+          caches.open(CACHE_NAME).then(function(cache){ cache.put(cacheKey, copy); });
         }
         return response;
       }).catch(function(){ return cached; });

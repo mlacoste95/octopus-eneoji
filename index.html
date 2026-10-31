@@ -393,15 +393,15 @@ button{font-family:var(--font-body);}
     if(!navigator.onLine || !db) return;
     getAllPendingPhotos().then(function(pending){
       pending.forEach(function(rec){
-        var ref = storage.ref(rec.path);
-        ref.put(rec.blob).then(function(){ return ref.getDownloadURL(); }).then(function(url){
+        uploadWithTimeout(rec.blob, rec.path, 15000).then(function(res){
+          if(!res.ok) return;
           return db.collection("leads").doc(rec.leadId).update({
-            photos: firebase.firestore.FieldValue.arrayUnion({id: rec.localId, url: url, path: rec.path})
+            photos: firebase.firestore.FieldValue.arrayUnion({id: rec.localId, url: res.url, path: rec.path})
+          }).then(function(){
+            return removePendingPhoto(rec.localId);
+          }).then(function(){
+            if(currentOpenLeadId === rec.leadId && typeof refreshOpenPhotoGrid === "function") refreshOpenPhotoGrid();
           });
-        }).then(function(){
-          return removePendingPhoto(rec.localId);
-        }).then(function(){
-          if(currentOpenLeadId === rec.leadId && typeof refreshOpenPhotoGrid === "function") refreshOpenPhotoGrid();
         }).catch(function(){});
       });
     });
@@ -409,6 +409,33 @@ button{font-family:var(--font-body);}
   var currentOpenLeadId = null;
   var refreshOpenPhotoGrid = null;
   window.addEventListener("online", flushPendingPhotos);
+
+  function uploadWithTimeout(blob, path, ms){
+    return new Promise(function(resolve){
+      var settled = false;
+      var ref = storage.ref(path);
+      var task = ref.put(blob);
+      var timer = setTimeout(function(){
+        if(settled) return;
+        settled = true;
+        try{ task.cancel(); }catch(e){}
+        resolve({ok:false});
+      }, ms);
+      task.then(function(){
+        return ref.getDownloadURL();
+      }).then(function(url){
+        if(settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve({ok:true, url:url});
+      }).catch(function(){
+        if(settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve({ok:false});
+      });
+    });
+  }
 
   var COLUMNS = [
     {key:"nouveau", label:"Nouveau lead", accent:"var(--accent)"},
@@ -1037,14 +1064,13 @@ button{font-family:var(--font-body);}
           Promise.all(blobs.map(function(b){
             var photoId = "p_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
             var path = "leads/" + l.id + "/" + photoId + ".jpg";
-            if(!navigator.onLine){
+            function queueIt(){
               return addPendingPhoto({localId: photoId, leadId: l.id, blob: b, path: path}).then(function(){ return {pending:true}; });
             }
-            var ref = storage.ref(path);
-            return ref.put(b).then(function(){ return ref.getDownloadURL(); }).then(function(url){
-              return {id: photoId, url: url, path: path};
-            }).catch(function(){
-              return addPendingPhoto({localId: photoId, leadId: l.id, blob: b, path: path}).then(function(){ return {pending:true}; });
+            if(!navigator.onLine) return queueIt();
+            return uploadWithTimeout(b, path, 6000).then(function(res){
+              if(res.ok) return {id: photoId, url: res.url, path: path};
+              return queueIt();
             });
           })).then(function(results){
             var synced = results.filter(function(r){ return !r.pending; });

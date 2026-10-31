@@ -774,7 +774,7 @@ button{font-family:var(--font-body);}
             return da - db2;
           });
         } else if(col.key === "nouveau"){
-          items.sort(function(a,b){ return (b.createdAt||0) - (a.createdAt||0); });
+          items.sort(function(a,b){ return (a.createdAt||0) - (b.createdAt||0); });
         } else if(col.key === "devis_envoye"){
           items.sort(function(a,b){
             var da = a.devisEnvoyeDate || Infinity;

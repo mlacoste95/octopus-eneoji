@@ -7,6 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#F4F1EA">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>Octopus</title>
 <style>
 /* Layout: horizontal kanban, columns scroll together in one contained strip; a card opens a detail drawer with a stage selector (the reliable fallback to drag-and-drop) */
@@ -1178,6 +1181,13 @@ button{font-family:var(--font-body);}
     }
   });
 })();
+</script>
+<script>
+if("serviceWorker" in navigator){
+  window.addEventListener("load", function(){
+    navigator.serviceWorker.register("sw.js");
+  });
+}
 </script>
 </body>
 </html>

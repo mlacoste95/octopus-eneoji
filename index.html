@@ -61,6 +61,26 @@ button{font-family:var(--font-body);}
 .btn[hidden]{display:none;}
 
 .zone-filter{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;}
+.fab-new{display:none;}
+@media (max-width:640px){
+  .topbar{ gap:10px; margin-bottom:14px; }
+  .topbar h1{ font-size:1.1rem; }
+  .octopus-mark{ width:32px; height:32px; }
+  .topbar-spacer{ display:none; }
+  .search-input{ flex-basis:100%; max-width:none; order:2; }
+  #btnAccepted, #btnRefused{ order:3; flex:1 1 auto; font-size:0.74rem; padding:8px 6px; justify-content:center; }
+  #btnNew{ display:none; }
+  .fab-new{
+    display:flex; align-items:center; justify-content:center;
+    position:fixed; right:max(18px, env(safe-area-inset-right,0px));
+    bottom:max(18px, env(safe-area-inset-bottom,0px));
+    width:56px; height:56px; border-radius:50%;
+    background:var(--accent); color:#fff; border:none; font-size:1.8rem; line-height:1;
+    box-shadow:0 6px 16px rgba(26,26,26,0.3); z-index:40; cursor:pointer;
+  }
+  .zone-filter{ flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .zone-filter .zone-btn{ flex:none; }
+}
 .zone-btn{
   font-family:var(--font-body); font-weight:700; font-size:0.78rem;
   border:1px solid var(--border); background:var(--surface); color:var(--ink-soft);
@@ -306,6 +326,7 @@ button{font-family:var(--font-body);}
   <button class="btn btn-ghost" id="btnRefused">Devis refusés <span id="refusedCount">(0)</span></button>
   <button class="btn btn-primary" id="btnNew">+ Nouveau lead</button>
 </div>
+<button class="fab-new" id="btnNewFab" aria-label="Nouveau lead">+</button>
 
 <div id="statusBanner" class="status-banner" hidden></div>
 
@@ -1230,6 +1251,8 @@ button{font-family:var(--font-body);}
   }
 
   btnNew.addEventListener("click", function(){ openNew(); });
+  var btnNewFab = document.getElementById("btnNewFab");
+  if(btnNewFab) btnNewFab.addEventListener("click", function(){ openNew(); });
   document.getElementById("btnAccepted").addEventListener("click", function(){ openHiddenStageList("devis_accepte", "Devis acceptés"); });
   document.getElementById("btnRefused").addEventListener("click", function(){ openHiddenStageList("devis_refuse", "Devis refusés"); });
 

@@ -137,6 +137,10 @@ button{font-family:var(--font-body);}
   position:absolute; top:2px; right:2px; width:18px; height:18px; border-radius:50%;
   background:rgba(26,26,26,0.65); color:#fff; border:none; font-size:0.7rem; line-height:1; cursor:pointer;
 }
+.photo-thumb .photo-pending{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  background:rgba(26,26,26,0.45); font-size:1.1rem;
+}
 .photo-add{
   width:72px; height:72px; border-radius:10px; border:1.5px dashed var(--border);
   background:none; color:var(--ink-muted); font-size:1.4rem; cursor:pointer;
@@ -336,6 +340,75 @@ button{font-family:var(--font-body);}
   var auth = firebase.auth();
   var storage = firebase.storage();
   try{ firebase.firestore().enablePersistence({synchronizeTabs:true}).catch(function(){}); }catch(e){}
+
+  var PENDING_DB_NAME = "octopus-pending-photos";
+  var PENDING_STORE = "photos";
+  function openPendingDb(){
+    return new Promise(function(resolve, reject){
+      var req = indexedDB.open(PENDING_DB_NAME, 1);
+      req.onupgradeneeded = function(){ req.result.createObjectStore(PENDING_STORE, {keyPath:"localId"}); };
+      req.onsuccess = function(){ resolve(req.result); };
+      req.onerror = function(){ reject(req.error); };
+    });
+  }
+  function addPendingPhoto(rec){
+    return openPendingDb().then(function(idb){
+      return new Promise(function(resolve, reject){
+        var tx = idb.transaction(PENDING_STORE, "readwrite");
+        tx.objectStore(PENDING_STORE).put(rec);
+        tx.oncomplete = function(){ resolve(); };
+        tx.onerror = function(){ reject(tx.error); };
+      });
+    });
+  }
+  function getPendingPhotosForLead(leadId){
+    return openPendingDb().then(function(idb){
+      return new Promise(function(resolve, reject){
+        var req = idb.transaction(PENDING_STORE, "readonly").objectStore(PENDING_STORE).getAll();
+        req.onsuccess = function(){ resolve(req.result.filter(function(r){ return r.leadId === leadId; })); };
+        req.onerror = function(){ reject(req.error); };
+      });
+    });
+  }
+  function getAllPendingPhotos(){
+    return openPendingDb().then(function(idb){
+      return new Promise(function(resolve, reject){
+        var req = idb.transaction(PENDING_STORE, "readonly").objectStore(PENDING_STORE).getAll();
+        req.onsuccess = function(){ resolve(req.result); };
+        req.onerror = function(){ reject(req.error); };
+      });
+    });
+  }
+  function removePendingPhoto(localId){
+    return openPendingDb().then(function(idb){
+      return new Promise(function(resolve, reject){
+        var tx = idb.transaction(PENDING_STORE, "readwrite");
+        tx.objectStore(PENDING_STORE).delete(localId);
+        tx.oncomplete = function(){ resolve(); };
+        tx.onerror = function(){ reject(tx.error); };
+      });
+    });
+  }
+  function flushPendingPhotos(){
+    if(!navigator.onLine || !db) return;
+    getAllPendingPhotos().then(function(pending){
+      pending.forEach(function(rec){
+        var ref = storage.ref(rec.path);
+        ref.put(rec.blob).then(function(){ return ref.getDownloadURL(); }).then(function(url){
+          return db.collection("leads").doc(rec.leadId).update({
+            photos: firebase.firestore.FieldValue.arrayUnion({id: rec.localId, url: url, path: rec.path})
+          });
+        }).then(function(){
+          return removePendingPhoto(rec.localId);
+        }).then(function(){
+          if(currentOpenLeadId === rec.leadId && typeof refreshOpenPhotoGrid === "function") refreshOpenPhotoGrid();
+        }).catch(function(){});
+      });
+    });
+  }
+  var currentOpenLeadId = null;
+  var refreshOpenPhotoGrid = null;
+  window.addEventListener("online", flushPendingPhotos);
 
   var COLUMNS = [
     {key:"nouveau", label:"Nouveau lead", accent:"var(--accent)"},
@@ -783,7 +856,7 @@ button{font-family:var(--font-body);}
     });
   }
 
-  function closeModal(){ overlay.hidden = true; modal.innerHTML = ""; }
+  function closeModal(){ overlay.hidden = true; modal.innerHTML = ""; currentOpenLeadId = null; refreshOpenPhotoGrid = null; }
   overlay.addEventListener("click", function(e){ if(e.target === overlay) closeModal(); });
 
   function stageOptions(selected){
@@ -908,31 +981,40 @@ button{font-family:var(--font-body);}
     var photoInputGallery = document.getElementById("fPhotoInputGallery");
     function renderPhotoGrid(){
       var photos = Array.isArray(l.photos) ? l.photos : [];
-      photoGrid.innerHTML = photos.map(function(p){
-        return '<div class="photo-thumb" data-id="' + esc(p.id) + '"><img src="' + esc(p.url) + '"><button type="button" class="rm" title="Supprimer">×</button></div>';
-      }).join("") +
-        '<button type="button" class="photo-add" id="btnAddPhotoCamera" title="Prendre une photo">📷</button>' +
-        '<button type="button" class="photo-add" id="btnAddPhotoGallery" title="Depuis la galerie">🖼️</button>';
-      var camBtn = document.getElementById("btnAddPhotoCamera");
-      var galBtn = document.getElementById("btnAddPhotoGallery");
-      if(camBtn) camBtn.addEventListener("click", function(){ photoInputCamera.click(); });
-      if(galBtn) galBtn.addEventListener("click", function(){ photoInputGallery.click(); });
-      Array.prototype.forEach.call(photoGrid.querySelectorAll(".photo-thumb"), function(thumb){
-        var url = (photos.find(function(p){ return p.id === thumb.dataset.id; }) || {}).url;
-        thumb.querySelector("img").addEventListener("click", function(){ if(url) viewPhoto(url); });
-      });
-      Array.prototype.forEach.call(photoGrid.querySelectorAll(".rm"), function(btn){
-        btn.addEventListener("click", function(e){
-          e.stopPropagation();
-          var id = btn.parentElement.dataset.id;
-          var removed = (l.photos || []).find(function(p){ return p.id === id; });
-          l.photos = (l.photos || []).filter(function(p){ return p.id !== id; });
-          renderPhotoGrid();
-          if(db && canWrite) db.collection("leads").doc(l.id).update({photos: l.photos});
-          if(removed && removed.path) storage.ref(removed.path).delete().catch(function(){});
+      getPendingPhotosForLead(l.id).then(function(pending){
+        var pendingPhotos = pending.map(function(p){ return {id: p.localId, url: URL.createObjectURL(p.blob), pending: true}; });
+        var all = photos.concat(pendingPhotos);
+        photoGrid.innerHTML = all.map(function(p){
+          return '<div class="photo-thumb" data-id="' + esc(p.id) + '">' +
+            '<img src="' + esc(p.url) + '">' +
+            (p.pending ? '<div class="photo-pending">⏳</div>' : '<button type="button" class="rm" title="Supprimer">×</button>') +
+          '</div>';
+        }).join("") +
+          '<button type="button" class="photo-add" id="btnAddPhotoCamera" title="Prendre une photo">📷</button>' +
+          '<button type="button" class="photo-add" id="btnAddPhotoGallery" title="Depuis la galerie">🖼️</button>';
+        var camBtn = document.getElementById("btnAddPhotoCamera");
+        var galBtn = document.getElementById("btnAddPhotoGallery");
+        if(camBtn) camBtn.addEventListener("click", function(){ photoInputCamera.click(); });
+        if(galBtn) galBtn.addEventListener("click", function(){ photoInputGallery.click(); });
+        Array.prototype.forEach.call(photoGrid.querySelectorAll(".photo-thumb"), function(thumb){
+          var url = (all.find(function(p){ return p.id === thumb.dataset.id; }) || {}).url;
+          thumb.querySelector("img").addEventListener("click", function(){ if(url) viewPhoto(url); });
+        });
+        Array.prototype.forEach.call(photoGrid.querySelectorAll(".rm"), function(btn){
+          btn.addEventListener("click", function(e){
+            e.stopPropagation();
+            var id = btn.parentElement.dataset.id;
+            var removed = (l.photos || []).find(function(p){ return p.id === id; });
+            l.photos = (l.photos || []).filter(function(p){ return p.id !== id; });
+            renderPhotoGrid();
+            if(db && canWrite) db.collection("leads").doc(l.id).update({photos: l.photos});
+            if(removed && removed.path) storage.ref(removed.path).delete().catch(function(){});
+          });
         });
       });
     }
+    currentOpenLeadId = l.id;
+    refreshOpenPhotoGrid = renderPhotoGrid;
     renderPhotoGrid();
 
     function handlePickedFiles(files){
@@ -955,14 +1037,24 @@ button{font-family:var(--font-body);}
           Promise.all(blobs.map(function(b){
             var photoId = "p_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
             var path = "leads/" + l.id + "/" + photoId + ".jpg";
+            if(!navigator.onLine){
+              return addPendingPhoto({localId: photoId, leadId: l.id, blob: b, path: path}).then(function(){ return {pending:true}; });
+            }
             var ref = storage.ref(path);
             return ref.put(b).then(function(){ return ref.getDownloadURL(); }).then(function(url){
               return {id: photoId, url: url, path: path};
+            }).catch(function(){
+              return addPendingPhoto({localId: photoId, leadId: l.id, blob: b, path: path}).then(function(){ return {pending:true}; });
             });
           })).then(function(results){
-            l.photos = (l.photos || []).concat(results);
+            var synced = results.filter(function(r){ return !r.pending; });
+            var pendingCount = results.length - synced.length;
+            if(synced.length){
+              l.photos = (l.photos || []).concat(synced);
+              if(db && canWrite) db.collection("leads").doc(l.id).update({photos: l.photos});
+            }
             renderPhotoGrid();
-            if(db && canWrite) db.collection("leads").doc(l.id).update({photos: l.photos});
+            if(pendingCount) showBanner(pendingCount + " photo(s) en attente de réseau : elles s'enverront automatiquement au retour de la connexion.");
           }).catch(function(err){
             showBanner("Échec de l'envoi de la photo (" + ((err && err.code) || "erreur") + "). Réessaie.");
             resetBtns();
@@ -1178,6 +1270,7 @@ button{font-family:var(--font-body);}
         else showBanner("Impossible de charger les leads pour le moment.");
         render();
       });
+      flushPendingPhotos();
     }
   });
 })();

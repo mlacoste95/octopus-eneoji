@@ -1,0 +1,1161 @@
+<title>Octopus</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: horizontal kanban, columns scroll together in one contained strip; a card opens a detail drawer with a stage selector (the reliable fallback to drag-and-drop) */
+:root{
+  --bg:#F4F1EA; --surface:#FFFFFF; --surface-2:#EDE9E0;
+  --ink:#1A1A1A; --ink-soft:#4A5550; --ink-muted:#8A9490;
+  --brand:#2A3A35; --accent:#D6673B; --accent-deep:#C05530; --border:rgba(26,26,26,0.10);
+  --success:#3E7A5E; --lost:#9B5A48;
+  --font-display:"Archivo","Helvetica Neue",sans-serif;
+  --font-body:"Manrope",-apple-system,sans-serif;
+  color-scheme: light;
+}
+*{box-sizing:border-box;}
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--font-body);
+  padding-left:max(16px, env(safe-area-inset-left,0px));
+  padding-right:max(16px, env(safe-area-inset-right,0px));
+  padding-block:20px 48px;
+}
+h1,h2,h3{font-family:var(--font-display); margin:0; text-wrap:balance;}
+button{font-family:var(--font-body);}
+
+.topbar{
+  display:flex; align-items:center; flex-wrap:wrap; gap:12px 20px;
+  margin-bottom:18px;
+}
+.brand-row{display:flex; align-items:center; gap:12px;}
+.search-input{
+  flex:1 1 220px; max-width:360px; font-family:var(--font-body); font-size:0.88rem;
+  color:var(--ink); background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:9px 12px;
+}
+.search-input:focus{outline:2px solid var(--accent); outline-offset:1px;}
+.octopus-mark{width:40px; height:40px; flex:none;}
+.topbar h1{font-size:1.3rem; color:var(--brand);}
+.topbar .sub{font-size:0.82rem; color:var(--ink-muted); margin-top:2px;}
+.topbar-spacer{flex:1;}
+.btn{
+  font-family:var(--font-body); font-weight:700; font-size:0.86rem;
+  border:none; border-radius:10px; padding:10px 16px; cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px;
+}
+.btn-primary{background:var(--accent); color:#fff;}
+.btn-primary:hover{background:var(--accent-deep);}
+.btn-ghost{background:transparent; color:var(--ink-soft); border:1px solid var(--border);}
+.btn-danger{background:transparent; color:#B23A2E; border:1px solid rgba(178,58,46,0.35);}
+.btn-danger.confirm{background:#B23A2E; color:#fff; border-color:#B23A2E;}
+.btn[disabled]{opacity:0.5; cursor:not-allowed;}
+
+.zone-filter{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;}
+.zone-btn{
+  font-family:var(--font-body); font-weight:700; font-size:0.78rem;
+  border:1px solid var(--border); background:var(--surface); color:var(--ink-soft);
+  border-radius:999px; padding:6px 14px; cursor:pointer;
+}
+.zone-btn .sw{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle;}
+.zone-btn.active{background:var(--brand); color:var(--bg); border-color:var(--brand);}
+.zone-badge{
+  font-size:0.68rem; font-weight:700; border-radius:999px; padding:2px 8px;
+  color:#fff; white-space:nowrap;
+}
+
+.status-banner{
+  font-size:0.85rem; color:var(--ink-soft); background:var(--surface-2);
+  border-radius:10px; padding:10px 14px; margin-bottom:16px;
+}
+
+.board{
+  display:flex; gap:14px; overflow-x:auto; padding-bottom:10px;
+  scroll-snap-type:x proximity;
+}
+.column{
+  flex:0 0 272px; scroll-snap-align:start;
+  display:flex; flex-direction:column; gap:10px;
+}
+.column-head{
+  display:flex; align-items:center; gap:8px;
+  font-family:var(--font-display); font-weight:700; font-size:0.86rem;
+  color:var(--ink); padding:2px 2px 4px;
+  border-bottom:2px solid var(--col-accent, var(--border));
+}
+.column-head .dot{width:8px; height:8px; border-radius:50%; background:var(--col-accent, var(--ink-muted));}
+.column-head .count{
+  margin-left:auto; font-family:var(--font-body); font-weight:600; font-size:0.76rem;
+  color:var(--ink-muted); background:var(--surface-2); border-radius:999px; padding:2px 8px;
+}
+.cards{display:flex; flex-direction:column; gap:8px; min-height:60px;}
+.cards.drag-over{background:var(--surface-2); border-radius:10px;}
+
+.card{
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  padding:11px 12px; cursor:pointer; display:flex; flex-direction:column; gap:5px;
+  box-shadow:0 1px 2px rgba(0,0,0,0.04);
+}
+.card:hover{border-color:var(--accent);}
+.card.stale-warn{border-color:#C79A3E; border-width:1.5px;}
+.card.stale-urgent{border-color:#B23A2E; border-width:1.5px;}
+.stale-flag{font-size:0.72rem; font-weight:700;}
+.stale-flag.warn{color:#9C7A2E;}
+.stale-flag.urgent{color:#B23A2E;}
+.card .name{font-weight:700; font-size:0.92rem; color:var(--ink);}
+.card .name .city{font-weight:500; color:var(--ink-soft); font-size:0.9em;}
+.card .meta{display:flex; align-items:center; flex-wrap:wrap; gap:6px;}
+.card .meta .age{margin-left:auto;}
+.badge{
+  font-size:0.68rem; font-weight:700; letter-spacing:0.02em; text-transform:uppercase;
+  color:var(--brand); background:var(--surface-2); border-radius:999px; padding:2px 8px;
+}
+.card .phone{font-size:0.78rem; font-variant-numeric:tabular-nums; color:var(--ink-soft); display:flex; align-items:center; gap:5px; background:none; border:none; padding:0; cursor:pointer; font-family:var(--font-body);}
+.card .phone:hover{color:var(--accent-deep);}
+.card .phone.copied{color:var(--success);}
+.card .rdv-date{font-size:0.78rem; color:var(--brand); font-weight:700; font-variant-numeric:tabular-nums;}
+.card .received-date{font-size:0.78rem; color:var(--ink-muted); font-variant-numeric:tabular-nums;}
+.gcal-link{
+  display:inline-flex; align-items:center; gap:6px; font-size:0.82rem; font-weight:700;
+  color:var(--accent-deep); text-decoration:none;
+}
+.gcal-link:hover{text-decoration:underline;}
+
+.photo-grid{display:flex; flex-wrap:wrap; gap:8px; margin-top:4px;}
+.photo-thumb{position:relative; width:72px; height:72px; border-radius:10px; overflow:hidden; border:1px solid var(--border);}
+.photo-thumb img{width:100%; height:100%; object-fit:cover; display:block; cursor:pointer;}
+.photo-thumb .rm{
+  position:absolute; top:2px; right:2px; width:18px; height:18px; border-radius:50%;
+  background:rgba(26,26,26,0.65); color:#fff; border:none; font-size:0.7rem; line-height:1; cursor:pointer;
+}
+.photo-add{
+  width:72px; height:72px; border-radius:10px; border:1.5px dashed var(--border);
+  background:none; color:var(--ink-muted); font-size:1.4rem; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.photo-add[disabled]{opacity:0.5;}
+
+.annot-overlay{
+  position:fixed; inset:0; background:rgba(16,20,18,0.88); z-index:100;
+  display:flex; align-items:center; justify-content:center; padding:16px;
+}
+.annot-panel{
+  background:var(--surface); border-radius:16px; padding:16px;
+  display:flex; flex-direction:column; gap:12px;
+  max-width:100%; max-height:100%;
+}
+#annotCanvas{
+  max-width:100%; max-height:62vh; width:auto; height:auto;
+  border-radius:10px; touch-action:none; display:block; background:#111; cursor:crosshair;
+}
+.annot-tools{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.annot-swatch{
+  width:28px; height:28px; border-radius:50%; border:2px solid var(--border);
+  cursor:pointer; padding:0;
+}
+.annot-swatch.active{border-color:var(--ink); box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--ink);}
+.annot-clear{
+  margin-left:auto; font-size:0.8rem; font-weight:700; color:var(--ink-soft);
+  background:none; border:1px solid var(--border); border-radius:8px; padding:6px 10px; cursor:pointer;
+}
+.annot-actions{display:flex; justify-content:space-between; gap:10px;}
+.annot-counter{font-size:0.78rem; color:var(--ink-muted); text-align:center;}
+.hidden-list{display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow-y:auto;}
+.hidden-list-row{
+  border:1px solid var(--border); border-radius:10px; padding:10px 12px; cursor:pointer;
+}
+.hidden-list-row:hover{border-color:var(--accent);}
+.hidden-list-meta{font-size:0.8rem; color:var(--ink-muted); margin-top:3px;}
+.card .age{font-size:0.72rem; color:var(--ink-muted); white-space:nowrap;}
+.source-ico{font-size:0.85rem; display:inline-flex; align-items:center;}
+.source-ico img{width:14px; height:14px; border-radius:3px; display:block;}
+.card .notes-preview{
+  font-size:0.78rem; color:var(--ink-muted); overflow:hidden; text-overflow:ellipsis;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+}
+
+.col-add-card{
+  font-family:var(--font-body); font-weight:700; font-size:0.8rem;
+  color:var(--ink-muted); background:none; border:1.5px dashed var(--border);
+  border-radius:12px; padding:10px; cursor:pointer; text-align:center;
+}
+.col-add-card:hover{color:var(--accent-deep); border-color:var(--accent);}
+.relance-marker{
+  font-family:var(--font-display); font-weight:700; font-size:0.74rem;
+  color:#B23A2E; text-align:center; text-transform:uppercase; letter-spacing:0.04em;
+  border-top:1.5px dashed #B23A2E; padding-top:8px; margin-top:2px;
+}
+.empty-tile{
+  border:1.5px dashed var(--border); border-radius:12px; padding:16px 12px;
+  text-align:center; font-size:0.78rem; color:var(--ink-muted);
+}
+
+/* modal */
+.overlay{
+  position:fixed; inset:0; background:rgba(16,20,18,0.45);
+  display:flex; align-items:flex-end; justify-content:center; z-index:50;
+  padding:0;
+}
+@media (min-width:640px){
+  .overlay{align-items:center; padding:20px;}
+}
+.modal{
+  background:var(--surface); width:100%; max-width:480px;
+  max-height:92vh; overflow-y:auto;
+  border-radius:16px 16px 0 0; padding:22px 20px 24px;
+  display:flex; flex-direction:column; gap:14px;
+}
+@media (min-width:640px){ .modal{border-radius:16px;} }
+.modal h2{font-size:1.1rem; color:var(--brand);}
+.field{display:flex; flex-direction:column; gap:5px;}
+.field label{font-size:0.76rem; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em;}
+.field input, .field select, .field textarea{
+  font-family:var(--font-body); font-size:0.92rem; color:var(--ink);
+  background:var(--bg); border:1px solid var(--border); border-radius:8px;
+  padding:9px 11px; width:100%;
+}
+.field textarea{min-height:72px; resize:vertical;}
+.field input:focus, .field select:focus, .field textarea:focus{outline:2px solid var(--accent); outline-offset:1px;}
+.equip-check-group{display:flex; flex-wrap:wrap; gap:8px;}
+.equip-check{
+  display:flex; align-items:center; gap:6px; font-size:0.85rem; font-weight:600;
+  text-transform:none; letter-spacing:normal; color:var(--ink); cursor:pointer;
+  padding:9px 14px; min-height:40px; border:1.5px solid var(--border); border-radius:20px;
+  background:var(--bg); -webkit-tap-highlight-color:transparent; user-select:none;
+  transition:background .12s, border-color .12s, color .12s;
+}
+.equip-check input{position:absolute; opacity:0; width:1px; height:1px;}
+.equip-check.checked{background:var(--accent); border-color:var(--accent); color:#fff;}
+.modal-actions{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:4px;}
+.modal-actions .right{display:flex; gap:8px;}
+.modal-close{
+  position:absolute; top:14px; right:14px; background:none; border:none;
+  color:var(--ink-muted); font-size:1.3rem; cursor:pointer; line-height:1; padding:4px;
+}
+.modal-wrap{position:relative;}
+.meta-row{font-size:0.74rem; color:var(--ink-muted);}
+.auth-gate{
+  min-height:70vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:14px; text-align:center; padding:24px;
+}
+.auth-gate .octopus-mark{width:64px; height:64px;}
+.auth-gate h1{font-size:1.6rem; color:var(--brand);}
+.auth-gate p{color:var(--ink-soft); font-size:0.92rem; max-width:320px; margin:0;}
+</style>
+
+<div id="authGate" class="auth-gate">
+  <svg class="octopus-mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M14 30 Q14 8 32 8 Q50 8 50 30 L50 35 Q50 39 46 39 L18 39 Q14 39 14 35 Z" fill="var(--brand)"/>
+    <circle cx="24" cy="21" r="3.2" fill="var(--bg)"/>
+    <circle cx="40" cy="21" r="3.2" fill="var(--bg)"/>
+    <g fill="none" stroke="var(--brand)" stroke-width="4.2" stroke-linecap="round">
+      <path d="M17 38 Q11 46 16 53 Q19 57 15 59"/>
+      <path d="M23 39 Q20 48 24 55 Q27 59 23 60"/>
+      <path d="M29 39.5 Q28 50 31 57"/>
+      <path d="M35 39.5 Q36 50 33 57"/>
+      <path d="M41 39 Q44 48 40 55 Q37 59 41 60"/>
+      <path d="M47 38 Q53 46 48 53 Q45 57 49 59"/>
+    </g>
+  </svg>
+  <h1>Octopus</h1>
+  <p id="authGateMsg">Connexion en cours…</p>
+  <button class="btn btn-primary" id="btnGoogleSignIn" hidden>Se connecter avec Google</button>
+  <button class="btn btn-ghost" id="btnSignOut" hidden>Se déconnecter</button>
+</div>
+
+<div id="appRoot" hidden>
+<div class="topbar">
+  <div class="brand-row">
+    <svg class="octopus-mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M14 30 Q14 8 32 8 Q50 8 50 30 L50 35 Q50 39 46 39 L18 39 Q14 39 14 35 Z" fill="var(--brand)"/>
+      <circle cx="24" cy="21" r="3.2" fill="var(--bg)"/>
+      <circle cx="40" cy="21" r="3.2" fill="var(--bg)"/>
+      <g fill="none" stroke="var(--brand)" stroke-width="4.2" stroke-linecap="round">
+        <path d="M17 38 Q11 46 16 53 Q19 57 15 59"/>
+        <path d="M23 39 Q20 48 24 55 Q27 59 23 60"/>
+        <path d="M29 39.5 Q28 50 31 57"/>
+        <path d="M35 39.5 Q36 50 33 57"/>
+        <path d="M41 39 Q44 48 40 55 Q37 59 41 60"/>
+        <path d="M47 38 Q53 46 48 53 Q45 57 49 59"/>
+      </g>
+    </svg>
+    <div>
+      <h1>Octopus</h1>
+    </div>
+  </div>
+  <div class="topbar-spacer"></div>
+  <input type="search" id="searchInput" class="search-input" placeholder="Rechercher un client, téléphone, ville…">
+  <button class="btn btn-ghost" id="btnAccepted">Devis acceptés <span id="acceptedCount">(0)</span></button>
+  <button class="btn btn-ghost" id="btnRefused">Devis refusés <span id="refusedCount">(0)</span></button>
+  <button class="btn btn-primary" id="btnNew">+ Nouveau lead</button>
+</div>
+
+<div id="statusBanner" class="status-banner" hidden></div>
+
+<div class="zone-filter" id="zoneFilter"></div>
+
+<div class="board" id="board"></div>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="modal-wrap">
+    <div class="modal" id="modal"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.14.1/firebase-app-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.14.1/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.14.1/firebase-storage-compat.js"></script>
+<script>
+(function(){
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDOflEa4oHbJ10sGhF5EzgbeuOZGKUflP8",
+    authDomain: "octopus-ed04d.firebaseapp.com",
+    projectId: "octopus-ed04d",
+    storageBucket: "octopus-ed04d.firebasestorage.app",
+    messagingSenderId: "5809628281",
+    appId: "1:5809628281:web:7fc01581c810fd36bf60a8"
+  };
+  var ALLOWED_EMAILS = ["mallaurylacoste95@gmail.com", "contact.eneoji@gmail.com"];
+
+  firebase.initializeApp(FIREBASE_CONFIG);
+  var auth = firebase.auth();
+  var storage = firebase.storage();
+  try{ firebase.firestore().enablePersistence({synchronizeTabs:true}).catch(function(){}); }catch(e){}
+
+  var COLUMNS = [
+    {key:"nouveau", label:"Nouveau lead", accent:"var(--accent)"},
+    {key:"rdv_programme", label:"RDV programmé", accent:"#6A8CC7"},
+    {key:"rdv_fait", label:"RDV fait", accent:"#6A8CC7"},
+    {key:"devis_envoye", label:"Devis envoyé", accent:"#7E6AC7"},
+    {key:"devis_relance", label:"Devis en relance", accent:"#7E6AC7"},
+    {key:"devis_accepte", label:"Devis accepté", accent:"var(--success)", hidden:true},
+    {key:"devis_refuse", label:"Devis refusé", accent:"var(--lost)", hidden:true}
+  ];
+  var EQUIPMENT = ["PAC Air/Eau","Clim","Gainable","VMC","CET","PV","Entretien","Autre"];
+  var SOURCES = ["Email","Site web","Leads Engie","Autre"];
+  var SOURCE_ICONS = {"Email":"✉️","Site web":"🌐","Leads Engie":"⚡","Autre":"❓"};
+  var ENGIE_LOGO = "data:image/png;base64,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";
+  var ZONES = [
+    {key:"Gironde", color:"#5B7FA6"},
+    {key:"Landes", color:"#4F8F63"},
+    {key:"Pyrénées-Atlantiques", color:"#A66A4F"}
+  ];
+  function zoneColor(z){ var m = ZONES.find(function(x){ return x.key === z; }); return m ? m.color : "#8A9490"; }
+
+  var board = document.getElementById("board");
+  var overlay = document.getElementById("overlay");
+  var modal = document.getElementById("modal");
+  var statusBanner = document.getElementById("statusBanner");
+  var btnNew = document.getElementById("btnNew");
+  var zoneFilterEl = document.getElementById("zoneFilter");
+
+  var currentZone = "all";
+  try{ currentZone = localStorage.getItem("eneoji_leads_zone_filter") || "all"; }catch(e){}
+
+  function renderZoneFilter(){
+    var all = [{key:"all", label:"Toutes les zones", color:null}].concat(ZONES.map(function(z){ return {key:z.key, label:z.key, color:z.color}; }));
+    zoneFilterEl.innerHTML = all.map(function(z){
+      var active = z.key === currentZone ? " active" : "";
+      var sw = z.color ? '<span class="sw" style="background:' + z.color + '"></span>' : "";
+      return '<button class="zone-btn' + active + '" data-zone="' + esc(z.key) + '">' + sw + esc(z.label) + '</button>';
+    }).join("");
+    Array.prototype.forEach.call(zoneFilterEl.querySelectorAll(".zone-btn"), function(btn){
+      btn.addEventListener("click", function(){
+        currentZone = btn.dataset.zone;
+        try{ localStorage.setItem("eneoji_leads_zone_filter", currentZone); }catch(e){}
+        renderZoneFilter();
+        render();
+      });
+    });
+  }
+  renderZoneFilter();
+
+  var searchQuery = "";
+  var searchInput = document.getElementById("searchInput");
+  var searchDebounce = null;
+  searchInput.addEventListener("input", function(){
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(function(){
+      searchQuery = searchInput.value.trim().toLowerCase();
+      render();
+    }, 300);
+  });
+  function matchesSearch(l){
+    if(!searchQuery) return true;
+    var haystack = [
+      l.name, l.ville, l.phone, l.email, l.adresse, l.notes, l.crVisite,
+      toArray(l.equipment).join(" ")
+    ].filter(Boolean).join(" ").toLowerCase();
+    return haystack.indexOf(searchQuery) !== -1;
+  }
+
+  var db = null, myId = null;
+  var leads = [];
+  var dbReady = false;
+  var canWrite = true;
+
+  function esc(s){
+    var d = document.createElement("div");
+    d.textContent = s == null ? "" : String(s);
+    return d.innerHTML;
+  }
+
+  function relTime(ts){
+    if(!ts) return "";
+    var diff = Date.now() - ts;
+    var day = 86400000;
+    if(diff < 3600000) return "il y a " + Math.max(1, Math.round(diff/60000)) + " min";
+    if(diff < day) return "il y a " + Math.round(diff/3600000) + " h";
+    var days = Math.round(diff/day);
+    return days === 1 ? "il y a 1 j" : "il y a " + days + " j";
+  }
+
+  var ANNOT_COLORS = ["#E53935","#FB8C00","#FDD835","#43A047","#1E88E5","#1A1A1A","#FFFFFF"];
+
+  function annotatePhoto(file, indexLabel){
+    return new Promise(function(resolve){
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      var loadTimeout = setTimeout(function(){
+        URL.revokeObjectURL(url);
+        resolve(file);
+      }, 8000);
+      img.onload = function(){
+        clearTimeout(loadTimeout);
+        var maxW = 1000, maxH = 1000;
+        var scale = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight);
+        var w = Math.max(1, Math.round(img.naturalWidth * scale));
+        var h = Math.max(1, Math.round(img.naturalHeight * scale));
+
+        var ov = document.createElement("div");
+        ov.className = "annot-overlay";
+        ov.innerHTML =
+          '<div class="annot-panel">' +
+            (indexLabel ? '<div class="annot-counter">' + esc(indexLabel) + '</div>' : '') +
+            '<canvas id="annotCanvas" width="' + w + '" height="' + h + '"></canvas>' +
+            '<div class="annot-tools">' +
+              ANNOT_COLORS.map(function(c, i){
+                return '<button type="button" class="annot-swatch' + (i===0?' active':'') + '" data-color="' + c + '" style="background:' + c + '" aria-label="Couleur"></button>';
+              }).join("") +
+              '<button type="button" class="annot-clear" id="annotClear">Tout effacer</button>' +
+            '</div>' +
+            '<div class="annot-actions">' +
+              '<button type="button" class="btn btn-ghost" id="annotCancel">Annuler la photo</button>' +
+              '<button type="button" class="btn btn-primary" id="annotOk">Valider</button>' +
+            '</div>' +
+          '</div>';
+        document.body.appendChild(ov);
+
+        var canvas = ov.querySelector("#annotCanvas");
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+
+        var color = ANNOT_COLORS[0];
+        Array.prototype.forEach.call(ov.querySelectorAll(".annot-swatch"), function(btn){
+          btn.addEventListener("click", function(){
+            color = btn.dataset.color;
+            Array.prototype.forEach.call(ov.querySelectorAll(".annot-swatch"), function(b){ b.classList.remove("active"); });
+            btn.classList.add("active");
+          });
+        });
+
+        var drawing = false, last = null;
+        function toCanvasPoint(e){
+          var r = canvas.getBoundingClientRect();
+          return {
+            x: (e.clientX - r.left) * (canvas.width / r.width),
+            y: (e.clientY - r.top) * (canvas.height / r.height)
+          };
+        }
+        canvas.addEventListener("pointerdown", function(e){
+          drawing = true;
+          last = toCanvasPoint(e);
+          canvas.setPointerCapture(e.pointerId);
+        });
+        canvas.addEventListener("pointermove", function(e){
+          if(!drawing) return;
+          var pt = toCanvasPoint(e);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 5;
+          ctx.lineCap = "round";
+          ctx.lineJoin = "round";
+          ctx.beginPath();
+          ctx.moveTo(last.x, last.y);
+          ctx.lineTo(pt.x, pt.y);
+          ctx.stroke();
+          last = pt;
+        });
+        canvas.addEventListener("pointerup", function(){ drawing = false; });
+        canvas.addEventListener("pointercancel", function(){ drawing = false; });
+
+        ov.querySelector("#annotClear").addEventListener("click", function(){
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, w, h);
+        });
+        ov.querySelector("#annotCancel").addEventListener("click", function(){
+          URL.revokeObjectURL(url);
+          document.body.removeChild(ov);
+          resolve(null);
+        });
+        ov.querySelector("#annotOk").addEventListener("click", function(){
+          canvas.toBlob(function(blob){
+            URL.revokeObjectURL(url);
+            document.body.removeChild(ov);
+            resolve(blob || file);
+          }, "image/jpeg", 0.85);
+        });
+      };
+      img.onerror = function(){ clearTimeout(loadTimeout); URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  }
+
+  function viewPhoto(url){
+    var ov = document.createElement("div");
+    ov.className = "annot-overlay";
+    ov.innerHTML =
+      '<div class="annot-panel">' +
+        '<img src="' + esc(url) + '" style="max-width:100%; max-height:76vh; width:auto; height:auto; border-radius:10px; display:block;">' +
+        '<div class="annot-actions"><div></div><button type="button" class="btn btn-primary" id="viewClose">Fermer</button></div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    function finish(){ document.body.removeChild(ov); }
+    ov.addEventListener("click", function(e){ if(e.target === ov) finish(); });
+    ov.querySelector("#viewClose").addEventListener("click", finish);
+  }
+
+  function formatPhoneDisplay(phone){
+    if(!phone) return "";
+    var digits = phone.replace(/[^0-9]/g, "");
+    if(digits.length === 10) return digits.match(/.{2}/g).join(" ");
+    return phone;
+  }
+
+  function telHref(phone){
+    return "tel:" + phone.replace(/[^0-9+]/g, "");
+  }
+
+  function formatDateOnly(ts){
+    if(!ts) return "";
+    var d = new Date(ts);
+    if(isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("fr-FR",{day:"2-digit",month:"short",year:"numeric"});
+  }
+
+  function toDateInputValue(ts){
+    var d = ts ? new Date(ts) : new Date();
+    function p(n){ return n < 10 ? "0"+n : ""+n; }
+    return d.getFullYear() + "-" + p(d.getMonth()+1) + "-" + p(d.getDate());
+  }
+
+  function parseDateInputToTs(v){
+    if(!v) return null;
+    var parts = v.split("-");
+    var d = new Date(parseInt(parts[0],10), parseInt(parts[1],10)-1, parseInt(parts[2],10), 12, 0, 0);
+    return d.getTime();
+  }
+
+  function formatRdv(iso){
+    if(!iso) return "";
+    var d = new Date(iso);
+    if(isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("fr-FR",{day:"2-digit",month:"short"}) + " à " + d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+  }
+
+  function toGCalUTC(d){
+    function p(n){ return n < 10 ? "0"+n : ""+n; }
+    return d.getUTCFullYear() + p(d.getUTCMonth()+1) + p(d.getUTCDate()) + "T" + p(d.getUTCHours()) + p(d.getUTCMinutes()) + p(d.getUTCSeconds()) + "Z";
+  }
+
+  function gcalLink(iso, title, details, location, endIso){
+    var start = new Date(iso);
+    if(isNaN(start.getTime())) return null;
+    var end = endIso ? new Date(endIso) : new Date(start.getTime() + 60*60*1000);
+    if(isNaN(end.getTime()) || end.getTime() <= start.getTime()) end = new Date(start.getTime() + 60*60*1000);
+    var params = new URLSearchParams({
+      action:"TEMPLATE", text:title,
+      dates: toGCalUTC(start) + "/" + toGCalUTC(end),
+      details: details || "",
+      location: location || ""
+    });
+    return "https://calendar.google.com/calendar/render?" + params.toString();
+  }
+
+  function mapsLink(address){
+    if(!address) return null;
+    return "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(address);
+  }
+
+  function showBanner(text){
+    statusBanner.textContent = text;
+    statusBanner.hidden = false;
+  }
+
+  function render(){
+    board.innerHTML = "";
+    COLUMNS.filter(function(c){ return !c.hidden; }).forEach(function(col){
+      var colEl = document.createElement("div");
+      colEl.className = "column";
+      colEl.style.setProperty("--col-accent", col.accent);
+
+      var head = document.createElement("div");
+      head.className = "column-head";
+      var items = leads.filter(function(l){
+        if(l.stage !== col.key) return false;
+        if(currentZone !== "all" && l.zone !== currentZone) return false;
+        if(!matchesSearch(l)) return false;
+        return true;
+      });
+      head.innerHTML = '<span class="dot"></span><span>' + esc(col.label) + '</span><span class="count">' + items.length + '</span>';
+      colEl.appendChild(head);
+
+      var cardsEl = document.createElement("div");
+      cardsEl.className = "cards";
+      cardsEl.dataset.stage = col.key;
+
+      cardsEl.addEventListener("dragover", function(e){ e.preventDefault(); cardsEl.classList.add("drag-over"); });
+      cardsEl.addEventListener("dragleave", function(){ cardsEl.classList.remove("drag-over"); });
+      cardsEl.addEventListener("drop", function(e){
+        e.preventDefault();
+        cardsEl.classList.remove("drag-over");
+        var id = e.dataTransfer.getData("text/plain");
+        if(id) moveLead(id, col.key);
+      });
+
+      if(items.length === 0 && !dbReady){
+        var sk = document.createElement("div");
+        sk.className = "empty-tile";
+        sk.textContent = "Chargement…";
+        cardsEl.appendChild(sk);
+      } else if(items.length === 0){
+        // no placeholder — the "+ Ajouter ici" tile below is enough
+      } else {
+        if(col.key === "rdv_programme"){
+          items.sort(function(a,b){
+            var da = a.rdvDate ? new Date(a.rdvDate).getTime() : Infinity;
+            var db2 = b.rdvDate ? new Date(b.rdvDate).getTime() : Infinity;
+            return da - db2;
+          });
+        } else if(col.key === "nouveau"){
+          items.sort(function(a,b){ return (b.createdAt||0) - (a.createdAt||0); });
+        } else if(col.key === "devis_envoye"){
+          items.sort(function(a,b){
+            var da = a.devisEnvoyeDate || Infinity;
+            var db2 = b.devisEnvoyeDate || Infinity;
+            return da - db2;
+          });
+        } else {
+          items.sort(function(a,b){ return (b.updatedAt||0) - (a.updatedAt||0); });
+        }
+        var relanceMarkerShown = false;
+        items.forEach(function(l){
+          if(col.key === "devis_envoye" && !relanceMarkerShown && l.devisEnvoyeDate){
+            var daysSentCheck = (Date.now() - l.devisEnvoyeDate) / 86400000;
+            if(daysSentCheck >= 20){
+              relanceMarkerShown = true;
+              var marker = document.createElement("div");
+              marker.className = "relance-marker";
+              marker.textContent = "⏰ À relancer (J+20)";
+              cardsEl.appendChild(marker);
+            }
+          }
+          var card = document.createElement("div");
+          var staleDays = (col.key === "devis_envoye" && l.devisEnvoyeDate)
+            ? (Date.now() - l.devisEnvoyeDate) / 86400000
+            : (l.updatedAt ? (Date.now() - l.updatedAt) / 86400000 : 0);
+          var isDevisStage = (l.stage === "devis_envoye" || l.stage === "devis_relance");
+          var staleClass = "", staleFlag = "";
+          if(isDevisStage && staleDays >= 40){
+            staleClass = " stale-urgent";
+            staleFlag = '<div class="stale-flag urgent">⏰ Relance urgente</div>';
+          }
+          card.className = "card" + staleClass;
+          card.dataset.leadId = l.id;
+          card.draggable = true;
+          card.addEventListener("dragstart", function(e){ e.dataTransfer.setData("text/plain", l.id); });
+          card.addEventListener("click", function(){ openDetail(l); });
+          card.innerHTML =
+            '<div class="name">' + esc(l.name || "Sans nom") + (l.ville ? ' <span class="city">— ' + esc(l.ville) + '</span>' : '') + '</div>' +
+            '<div class="meta">' + (l.source ? '<span class="source-ico" title="' + esc(l.source) + '">' + (l.source === "Leads Engie" ? '<img src="' + ENGIE_LOGO + '" alt="Engie">' : (SOURCE_ICONS[l.source]||"")) + '</span>' : '') +
+              (toArray(l.equipment).length ? toArray(l.equipment).map(function(e){ return '<span class="badge">' + esc(e) + '</span>'; }).join("") : '<span class="badge">—</span>') +
+              (l.zone ? '<span class="zone-badge" style="background:' + zoneColor(l.zone) + '">' + esc(l.zone) + '</span>' : '') + '<span class="age">' + relTime(l.updatedAt) + '</span></div>' +
+            staleFlag +
+            (l.stage === "devis_envoye" && l.devisEnvoyeDate ? '<div class="rdv-date">✉️ Envoyé le ' + esc(formatDateOnly(l.devisEnvoyeDate)) + '</div>' :
+              l.rdvDate ? '<div class="rdv-date">📅 ' + esc(formatRdv(l.rdvDate)) + '</div>' : (l.createdAt && l.stage !== "rdv_fait" && l.stage !== "rdv_programme" && l.stage !== "devis_envoye" ? '<div class="received-date">Reçu le ' + esc(formatDateOnly(l.createdAt)) + '</div>' : '')) +
+            (l.phone ? '<button type="button" class="phone">📞 <span class="phone-txt">' + esc(formatPhoneDisplay(l.phone)) + '</span></button>' : '') +
+            (l.notes ? '<div class="notes-preview">' + esc(l.notes) + '</div>' : '');
+          var phoneBtn = card.querySelector(".phone");
+          if(phoneBtn) phoneBtn.addEventListener("click", function(e){
+            e.stopPropagation();
+            var txt = phoneBtn.querySelector(".phone-txt").textContent;
+            var done = function(){
+              var original = phoneBtn.innerHTML;
+              phoneBtn.classList.add("copied");
+              phoneBtn.innerHTML = "✓ Copié";
+              setTimeout(function(){ phoneBtn.classList.remove("copied"); phoneBtn.innerHTML = original; }, 1500);
+            };
+            if(navigator.clipboard && navigator.clipboard.writeText){
+              navigator.clipboard.writeText(txt).then(done).catch(function(){});
+            }
+          });
+          cardsEl.appendChild(card);
+        });
+      }
+
+      var addCardBtn = document.createElement("button");
+      addCardBtn.type = "button";
+      addCardBtn.className = "col-add-card";
+      addCardBtn.textContent = "+ Ajouter ici";
+      addCardBtn.addEventListener("click", function(){ openNew(col.key); });
+      cardsEl.appendChild(addCardBtn);
+
+      colEl.appendChild(cardsEl);
+      board.appendChild(colEl);
+    });
+
+    if(searchQuery){
+      var firstMatch = board.querySelector(".card");
+      if(firstMatch) firstMatch.scrollIntoView({behavior:"smooth", inline:"center", block:"nearest"});
+    }
+
+    var acceptedCountEl = document.getElementById("acceptedCount");
+    var refusedCountEl = document.getElementById("refusedCount");
+    if(acceptedCountEl) acceptedCountEl.textContent = "(" + leads.filter(function(l){ return l.stage === "devis_accepte"; }).length + ")";
+    if(refusedCountEl) refusedCountEl.textContent = "(" + leads.filter(function(l){ return l.stage === "devis_refuse"; }).length + ")";
+  }
+
+  function openHiddenStageList(stageKey, title){
+    var items = leads.filter(function(l){ return l.stage === stageKey; });
+    var ov = document.createElement("div");
+    ov.className = "annot-overlay";
+    var rows = items.length
+      ? items.map(function(l){
+          return '<div class="hidden-list-row" data-id="' + esc(l.id) + '">' +
+            '<div><strong>' + esc(l.name || "Sans nom") + '</strong>' + (l.ville ? ' — ' + esc(l.ville) : '') + '</div>' +
+            '<div class="hidden-list-meta">' + esc(toArray(l.equipment).join(", ")) + (l.phone ? ' · ' + esc(formatPhoneDisplay(l.phone)) : '') + '</div>' +
+          '</div>';
+        }).join("")
+      : '<p style="color:var(--ink-muted); font-size:0.88rem;">Rien ici pour l\'instant.</p>';
+    ov.innerHTML =
+      '<div class="annot-panel" style="max-width:420px;">' +
+        '<h2 style="font-family:var(--font-display); color:var(--brand); font-size:1.1rem;">' + esc(title) + '</h2>' +
+        '<div class="hidden-list">' + rows + '</div>' +
+        '<div class="annot-actions"><div></div><button type="button" class="btn btn-primary" id="hiddenListClose">Fermer</button></div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    function finish(){ document.body.removeChild(ov); }
+    ov.addEventListener("click", function(e){ if(e.target === ov) finish(); });
+    ov.querySelector("#hiddenListClose").addEventListener("click", finish);
+    Array.prototype.forEach.call(ov.querySelectorAll(".hidden-list-row"), function(row){
+      row.addEventListener("click", function(){
+        var l = leads.find(function(x){ return x.id === row.dataset.id; });
+        finish();
+        if(l) openDetail(l);
+      });
+    });
+  }
+
+  function moveLead(id, newStage){
+    var l = leads.find(function(x){ return x.id === id; });
+    if(!l || l.stage === newStage) return;
+    var patch = {stage:newStage, updatedAt:Date.now()};
+    if(newStage === "devis_envoye" && !l.devisEnvoyeDate) patch.devisEnvoyeDate = Date.now();
+    Object.assign(l, patch);
+    render();
+    if(!db || !canWrite) return;
+    db.collection("leads").doc(id).update(patch).catch(function(err){
+      if(err && err.code === "permission-denied") showBanner("Lecture seule : tu n'as pas les droits pour modifier ce tableau.");
+    });
+  }
+
+  function closeModal(){ overlay.hidden = true; modal.innerHTML = ""; }
+  overlay.addEventListener("click", function(e){ if(e.target === overlay) closeModal(); });
+
+  function stageOptions(selected){
+    return COLUMNS.map(function(c){
+      return '<option value="' + c.key + '"' + (c.key===selected?' selected':'') + '>' + esc(c.label) + '</option>';
+    }).join("");
+  }
+  function readEquipment(){
+    return Array.prototype.map.call(modal.querySelectorAll('input[name="fEquip"]:checked'), function(el){ return el.value; });
+  }
+  function toArray(v){
+    if(Array.isArray(v)) return v;
+    if(v) return [v];
+    return [];
+  }
+  function equipmentCheckboxes(selected){
+    var sel = toArray(selected);
+    return '<div class="equip-check-group">' + EQUIPMENT.map(function(e){
+      var isChecked = sel.indexOf(e) !== -1;
+      return '<label class="equip-check' + (isChecked ? ' checked' : '') + '"><input type="checkbox" name="fEquip" value="' + esc(e) + '"' + (isChecked ? ' checked' : '') + '>' + esc(e) + '</label>';
+    }).join("") + '</div>';
+  }
+  function wireEquipmentChips(){
+    Array.prototype.forEach.call(modal.querySelectorAll('input[name="fEquip"]'), function(input){
+      input.addEventListener("change", function(){
+        var chip = input.closest(".equip-check");
+        if(chip) chip.classList.toggle("checked", input.checked);
+      });
+    });
+  }
+  function sourceOptions(selected){
+    var opts = '<option value=""' + (!selected?' selected':'') + '>—</option>';
+    return opts + SOURCES.map(function(s){
+      return '<option value="' + esc(s) + '"' + (s===selected?' selected':'') + '>' + esc(s) + '</option>';
+    }).join("");
+  }
+  function zoneOptions(selected){
+    var opts = '<option value=""' + (!selected?' selected':'') + '>—</option>';
+    return opts + ZONES.map(function(z){
+      return '<option value="' + esc(z.key) + '"' + (z.key===selected?' selected':'') + '>' + esc(z.key) + '</option>';
+    }).join("");
+  }
+
+  function openDetail(l){
+    overlay.hidden = false;
+    var visitMode = (l.stage === "rdv_programme" || l.stage === "rdv_fait");
+
+    var nameBlock = '<div class="field"><label>Nom du client</label><input id="fName" value="' + esc(l.name) + '"></div>';
+    var crPhotoBlock =
+      '<div class="field"><label>CR visite <span style="text-transform:none; font-weight:400;">(tout ce qui sert à faire le devis)</span></label><textarea id="fCrVisite" style="min-height:110px;">' + esc(l.crVisite) + '</textarea></div>' +
+      '<div class="field"><label>Photos</label><div class="photo-grid" id="photoGrid"></div><input type="file" id="fPhotoInputCamera" accept="image/*" capture="environment" hidden><input type="file" id="fPhotoInputGallery" accept="image/*" multiple hidden></div>';
+    var generalBlock =
+      '<div class="field"><label>Date de réception du lead</label><input type="date" id="fReceivedDate" value="' + toDateInputValue(l.createdAt) + '"></div>' +
+      '<div class="field"><label>Ville</label><input id="fVille" value="' + esc(l.ville) + '" placeholder="Ex. Dax"></div>' +
+      '<div class="field"><label>Zone</label><select id="fZone">' + zoneOptions(l.zone) + '</select></div>' +
+      '<div class="field"><label>Adresse précise</label><input id="fAdresse" value="' + esc(l.adresse) + '" placeholder="N°, rue, code postal et ville"></div>' +
+      '<div id="mapsWrap"></div>' +
+      '<div class="field"><label>Téléphone</label><input id="fPhone" value="' + esc(l.phone) + '"></div>' +
+      '<div class="field"><label>Email</label><input id="fEmail" value="' + esc(l.email) + '"></div>' +
+      '<div class="field"><label>Équipement</label>' + equipmentCheckboxes(l.equipment) + '</div>' +
+      '<div class="field"><label>Source</label><select id="fSource">' + sourceOptions(l.source) + '</select></div>' +
+      '<div class="field"><label>Lien vers le mail original</label><input id="fMailLink" value="' + esc(l.mailLink) + '" placeholder="https://mail.google.com/..."></div>' +
+      '<div id="mailLinkWrap"></div>' +
+      '<div class="field"><label>Étape</label><select id="fStage">' + stageOptions(l.stage) + '</select></div>' +
+      '<div class="field"><label>Date du RDV</label><input type="datetime-local" id="fRdvDate" value="' + esc(l.rdvDate ? l.rdvDate.slice(0,16) : "") + '"></div>' +
+      '<div id="gcalWrap"></div>' +
+      '<div class="field"><label>Date d\'envoi du devis <span style="text-transform:none; font-weight:400;">(automatique, modifiable si besoin)</span></label><input type="date" id="fDevisEnvoyeDate" value="' + (l.devisEnvoyeDate ? toDateInputValue(l.devisEnvoyeDate) : "") + '"></div>';
+    var notesBlock = '<div class="field"><label>Notes</label><textarea id="fNotes">' + esc(l.notes) + '</textarea></div>';
+
+    modal.innerHTML =
+      '<button class="modal-close" id="mClose" aria-label="Fermer">×</button>' +
+      '<h2>Modifier le lead</h2>' +
+      nameBlock +
+      (visitMode ? (crPhotoBlock + generalBlock + notesBlock) : (generalBlock + crPhotoBlock + notesBlock)) +
+      (l.stage === "rdv_programme" ? '<button type="button" class="btn btn-primary" id="btnRdvDone" style="width:100%; justify-content:center;">✓ RDV terminé</button>' : '') +
+      '<div class="meta-row">Créé ' + relTime(l.createdAt) + ' &middot; mis à jour ' + relTime(l.updatedAt) + '</div>' +
+      '<div class="modal-actions">' +
+        '<button class="btn btn-danger" id="btnDelete">Supprimer</button>' +
+        '<div class="right"><button class="btn btn-ghost" id="btnCancel">Annuler</button><button class="btn btn-primary" id="btnSave">Enregistrer</button></div>' +
+      '</div>';
+
+    document.getElementById("mClose").addEventListener("click", closeModal);
+    document.getElementById("btnCancel").addEventListener("click", closeModal);
+    wireEquipmentChips();
+
+    var btnRdvDone = document.getElementById("btnRdvDone");
+    if(btnRdvDone) btnRdvDone.addEventListener("click", function(){
+      var patch = buildPatchFromForm();
+      patch.stage = "rdv_fait";
+      savePatch(patch);
+    });
+
+    var gcalWrap = document.getElementById("gcalWrap");
+    var mapsWrap = document.getElementById("mapsWrap");
+    var dateInput = document.getElementById("fRdvDate");
+    var addrInput = document.getElementById("fAdresse");
+    function refreshGcal(){
+      var v = dateInput.value;
+      if(!v){ gcalWrap.innerHTML = ""; return; }
+      var link = gcalLink(v, "RDV Eneoji — " + (l.name || "client"), "Équipement : " + (l.equipment||"—") + (l.phone ? "\nTél : " + l.phone : ""), addrInput.value.trim());
+      gcalWrap.innerHTML = link ? '<a class="gcal-link" href="' + link + '" target="_blank" rel="noopener">📆 Ajouter à Google Agenda</a>' : "";
+    }
+    function refreshMaps(){
+      var link = mapsLink(addrInput.value.trim());
+      mapsWrap.innerHTML = link ? '<a class="gcal-link" href="' + link + '" target="_blank" rel="noopener">📍 Itinéraire</a>' : "";
+    }
+    var mailLinkWrap = document.getElementById("mailLinkWrap");
+    var mailLinkInput = document.getElementById("fMailLink");
+    function refreshMailLink(){
+      var v = mailLinkInput.value.trim();
+      mailLinkWrap.innerHTML = v ? '<a class="gcal-link" href="' + esc(v) + '" target="_blank" rel="noopener">📧 Ouvrir le mail original</a>' : "";
+    }
+    mailLinkInput.addEventListener("change", refreshMailLink);
+    refreshMailLink();
+    dateInput.addEventListener("change", refreshGcal);
+    addrInput.addEventListener("change", function(){ refreshGcal(); refreshMaps(); });
+    refreshGcal();
+    refreshMaps();
+
+    var photoGrid = document.getElementById("photoGrid");
+    var photoInputCamera = document.getElementById("fPhotoInputCamera");
+    var photoInputGallery = document.getElementById("fPhotoInputGallery");
+    function renderPhotoGrid(){
+      var photos = Array.isArray(l.photos) ? l.photos : [];
+      photoGrid.innerHTML = photos.map(function(p){
+        return '<div class="photo-thumb" data-id="' + esc(p.id) + '"><img src="' + esc(p.url) + '"><button type="button" class="rm" title="Supprimer">×</button></div>';
+      }).join("") +
+        '<button type="button" class="photo-add" id="btnAddPhotoCamera" title="Prendre une photo">📷</button>' +
+        '<button type="button" class="photo-add" id="btnAddPhotoGallery" title="Depuis la galerie">🖼️</button>';
+      var camBtn = document.getElementById("btnAddPhotoCamera");
+      var galBtn = document.getElementById("btnAddPhotoGallery");
+      if(camBtn) camBtn.addEventListener("click", function(){ photoInputCamera.click(); });
+      if(galBtn) galBtn.addEventListener("click", function(){ photoInputGallery.click(); });
+      Array.prototype.forEach.call(photoGrid.querySelectorAll(".photo-thumb"), function(thumb){
+        var url = (photos.find(function(p){ return p.id === thumb.dataset.id; }) || {}).url;
+        thumb.querySelector("img").addEventListener("click", function(){ if(url) viewPhoto(url); });
+      });
+      Array.prototype.forEach.call(photoGrid.querySelectorAll(".rm"), function(btn){
+        btn.addEventListener("click", function(e){
+          e.stopPropagation();
+          var id = btn.parentElement.dataset.id;
+          var removed = (l.photos || []).find(function(p){ return p.id === id; });
+          l.photos = (l.photos || []).filter(function(p){ return p.id !== id; });
+          renderPhotoGrid();
+          if(db && canWrite) db.collection("leads").doc(l.id).update({photos: l.photos});
+          if(removed && removed.path) storage.ref(removed.path).delete().catch(function(){});
+        });
+      });
+    }
+    renderPhotoGrid();
+
+    function handlePickedFiles(files){
+      if(!files.length) return;
+      var camBtn = document.getElementById("btnAddPhotoCamera");
+      var galBtn = document.getElementById("btnAddPhotoGallery");
+      if(camBtn) camBtn.disabled = true;
+      if(galBtn) galBtn.disabled = true;
+
+      function resetBtns(){ if(camBtn) camBtn.disabled = false; if(galBtn) galBtn.disabled = false; }
+
+      function annotateNext(i, blobs){
+        if(i >= files.length){
+          if(!blobs.length){ resetBtns(); return; }
+          if(!storage || !db || !canWrite){
+            showBanner("L'ajout de photo n'est pas disponible pour le moment.");
+            resetBtns();
+            return;
+          }
+          Promise.all(blobs.map(function(b){
+            var photoId = "p_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+            var path = "leads/" + l.id + "/" + photoId + ".jpg";
+            var ref = storage.ref(path);
+            return ref.put(b).then(function(){ return ref.getDownloadURL(); }).then(function(url){
+              return {id: photoId, url: url, path: path};
+            });
+          })).then(function(results){
+            l.photos = (l.photos || []).concat(results);
+            renderPhotoGrid();
+            if(db && canWrite) db.collection("leads").doc(l.id).update({photos: l.photos});
+          }).catch(function(err){
+            showBanner("Échec de l'envoi de la photo (" + ((err && err.code) || "erreur") + "). Réessaie.");
+            resetBtns();
+          });
+          return;
+        }
+        var label = files.length > 1 ? ("Photo " + (i + 1) + " / " + files.length) : "";
+        annotatePhoto(files[i], label).then(function(blob){
+          if(blob) blobs.push(blob);
+          annotateNext(i + 1, blobs);
+        });
+      }
+      annotateNext(0, []);
+    }
+
+    photoInputCamera.addEventListener("change", function(){
+      var files = Array.prototype.slice.call(photoInputCamera.files || []);
+      photoInputCamera.value = "";
+      handlePickedFiles(files);
+    });
+    photoInputGallery.addEventListener("change", function(){
+      var files = Array.prototype.slice.call(photoInputGallery.files || []);
+      photoInputGallery.value = "";
+      handlePickedFiles(files);
+    });
+
+    function buildPatchFromForm(){
+      var newStage = document.getElementById("fStage").value;
+      var devisDateVal = document.getElementById("fDevisEnvoyeDate").value;
+      var devisEnvoyeDate = devisDateVal ? parseDateInputToTs(devisDateVal) : (l.devisEnvoyeDate || null);
+      if(newStage === "devis_envoye" && l.stage !== "devis_envoye" && !devisEnvoyeDate){
+        devisEnvoyeDate = Date.now();
+      }
+      return {
+        devisEnvoyeDate: devisEnvoyeDate,
+        name: document.getElementById("fName").value.trim(),
+        ville: document.getElementById("fVille").value.trim(),
+        phone: document.getElementById("fPhone").value.trim(),
+        adresse: document.getElementById("fAdresse").value.trim(),
+        email: document.getElementById("fEmail").value.trim(),
+        equipment: readEquipment(),
+        zone: document.getElementById("fZone").value,
+        source: document.getElementById("fSource").value,
+        mailLink: document.getElementById("fMailLink").value.trim(),
+        createdAt: parseDateInputToTs(document.getElementById("fReceivedDate").value) || l.createdAt || Date.now(),
+        stage: document.getElementById("fStage").value,
+        rdvDate: document.getElementById("fRdvDate").value || null,
+        crVisite: document.getElementById("fCrVisite").value.trim(),
+        notes: document.getElementById("fNotes").value.trim(),
+        updatedAt: Date.now()
+      };
+    }
+    function savePatch(patch){
+      Object.assign(l, patch);
+      render();
+      closeModal();
+      if(db && canWrite){
+        db.collection("leads").doc(l.id).update(patch).catch(function(err){
+          if(err && err.code === "permission-denied") showBanner("Lecture seule : tu n'as pas les droits pour modifier ce tableau.");
+        });
+      }
+    }
+    document.getElementById("btnSave").addEventListener("click", function(){
+      savePatch(buildPatchFromForm());
+    });
+
+    var delBtn = document.getElementById("btnDelete");
+    var confirming = false, timer = null;
+    delBtn.addEventListener("click", function(){
+      if(!confirming){
+        confirming = true;
+        delBtn.textContent = "Confirmer la suppression ?";
+        delBtn.classList.add("confirm");
+        timer = setTimeout(function(){
+          confirming = false;
+          delBtn.textContent = "Supprimer";
+          delBtn.classList.remove("confirm");
+        }, 3000);
+        return;
+      }
+      clearTimeout(timer);
+      leads = leads.filter(function(x){ return x.id !== l.id; });
+      render();
+      closeModal();
+      if(db && canWrite) db.collection("leads").doc(l.id).delete();
+    });
+  }
+
+  function openNew(initialStage){
+    var targetStage = initialStage || "nouveau";
+    var targetLabel = (COLUMNS.find(function(c){ return c.key === targetStage; }) || {}).label || "";
+    overlay.hidden = false;
+    modal.innerHTML =
+      '<button class="modal-close" id="mClose" aria-label="Fermer">×</button>' +
+      '<h2>Nouveau lead' + (targetLabel ? ' — ' + esc(targetLabel) : '') + '</h2>' +
+      '<div class="field"><label>Date de réception du lead</label><input type="date" id="fReceivedDate" value="' + toDateInputValue() + '"></div>' +
+      '<div class="field"><label>Nom du client</label><input id="fName" placeholder="Ex. Jean Dupont"></div>' +
+      '<div class="field"><label>Ville</label><input id="fVille" placeholder="Ex. Dax"></div>' +
+      '<div class="field"><label>Zone</label><select id="fZone">' + zoneOptions() + '</select></div>' +
+      '<div class="field"><label>Adresse précise</label><input id="fAdresse" placeholder="N°, rue, code postal et ville"></div>' +
+      '<div class="field"><label>Téléphone</label><input id="fPhone" placeholder="06 00 00 00 00"></div>' +
+      '<div class="field"><label>Email</label><input id="fEmail"></div>' +
+      '<div class="field"><label>Équipement</label>' + equipmentCheckboxes() + '</div>' +
+      '<div class="field"><label>Source</label><select id="fSource">' + sourceOptions() + '</select></div>' +
+      '<div class="field"><label>Date du RDV (si connue)</label><input type="datetime-local" id="fRdvDate"></div>' +
+      '<div class="field"><label>Notes</label><textarea id="fNotes" placeholder="Contexte, besoin, origine du contact…"></textarea></div>' +
+      '<div class="modal-actions"><div></div><div class="right"><button class="btn btn-ghost" id="btnCancel">Annuler</button><button class="btn btn-primary" id="btnCreate">Ajouter</button></div></div>';
+
+    document.getElementById("mClose").addEventListener("click", closeModal);
+    document.getElementById("btnCancel").addEventListener("click", closeModal);
+    wireEquipmentChips();
+    document.getElementById("btnCreate").addEventListener("click", function(){
+      var name = document.getElementById("fName").value.trim();
+      if(!name){ document.getElementById("fName").focus(); return; }
+      var now = Date.now();
+      var data = {
+        name: name,
+        ville: document.getElementById("fVille").value.trim(),
+        phone: document.getElementById("fPhone").value.trim(),
+        adresse: document.getElementById("fAdresse").value.trim(),
+        email: document.getElementById("fEmail").value.trim(),
+        equipment: readEquipment(),
+        zone: document.getElementById("fZone").value,
+        source: document.getElementById("fSource").value,
+        rdvDate: document.getElementById("fRdvDate").value || null,
+        notes: document.getElementById("fNotes").value.trim(),
+        stage: targetStage,
+        createdAt: parseDateInputToTs(document.getElementById("fReceivedDate").value) || now, updatedAt: now,
+        createdBy: myId || null
+      };
+      var localId = "tmp_" + now;
+      leads.push(Object.assign({id: localId}, data));
+      render();
+      closeModal();
+      if(db && canWrite){
+        db.collection("leads").add(data).then(function(ref){
+          var l = leads.find(function(x){ return x.id === localId; });
+          if(l) l.id = ref.id;
+        }).catch(function(err){
+          leads = leads.filter(function(x){ return x.id !== localId; });
+          render();
+          if(err && err.code === "permission-denied") showBanner("Lecture seule : tu n'as pas les droits pour ajouter un lead.");
+        });
+      }
+    });
+  }
+
+  btnNew.addEventListener("click", function(){ openNew(); });
+  document.getElementById("btnAccepted").addEventListener("click", function(){ openHiddenStageList("devis_accepte", "Devis acceptés"); });
+  document.getElementById("btnRefused").addEventListener("click", function(){ openHiddenStageList("devis_refuse", "Devis refusés"); });
+
+  render();
+
+  var authGate = document.getElementById("authGate");
+  var authGateMsg = document.getElementById("authGateMsg");
+  var btnGoogleSignIn = document.getElementById("btnGoogleSignIn");
+  var btnSignOut = document.getElementById("btnSignOut");
+  var appRoot = document.getElementById("appRoot");
+
+  function showAuthGate(msg, showSignIn, showSignOut){
+    appRoot.hidden = true;
+    authGate.hidden = false;
+    authGateMsg.textContent = msg;
+    btnGoogleSignIn.hidden = !showSignIn;
+    btnSignOut.hidden = !showSignOut;
+  }
+
+  btnGoogleSignIn.addEventListener("click", function(){
+    var provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithRedirect(provider).catch(function(err){
+      showAuthGate("Connexion impossible (" + ((err && err.code) || "erreur") + "). Réessaie.", true, false);
+    });
+  });
+  btnSignOut.addEventListener("click", function(){ auth.signOut(); });
+
+  auth.getRedirectResult().catch(function(err){
+    if(err && err.code) showAuthGate("Connexion impossible (" + err.code + "). Réessaie.", true, false);
+  });
+
+  auth.onAuthStateChanged(function(user){
+    if(!user){
+      myId = null;
+      db = null;
+      showAuthGate("Connecte-toi pour accéder au pipeline.", true, false);
+      return;
+    }
+    var email = (user.email || "").toLowerCase();
+    if(ALLOWED_EMAILS.indexOf(email) === -1){
+      myId = null;
+      db = null;
+      showAuthGate("Le compte " + email + " n'est pas autorisé sur Octopus.", false, true);
+      return;
+    }
+    myId = user.uid;
+    appRoot.hidden = false;
+    authGate.hidden = true;
+    if(!db){
+      db = firebase.firestore();
+      db.collection("leads").onSnapshot(function(snap){
+        dbReady = true;
+        leads = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+        render();
+      }, function(err){
+        dbReady = true;
+        if(err && err.code === "permission-denied") showBanner("Accès refusé à ce tableau.");
+        else showBanner("Impossible de charger les leads pour le moment.");
+        render();
+      });
+    }
+  });
+})();
+</script>

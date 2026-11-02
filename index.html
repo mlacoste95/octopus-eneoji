@@ -98,9 +98,15 @@ button{font-family:var(--font-body);}
   border-radius:10px; padding:10px 14px; margin-bottom:16px;
 }
 
+#appRoot{
+  display:flex; flex-direction:column;
+  height:calc(100vh - 68px); height:calc(100dvh - 68px);
+}
+#appRoot[hidden]{display:none;}
 .board{
   display:flex; gap:14px; overflow-x:auto; padding-bottom:10px;
   scroll-snap-type:x proximity;
+  flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;
 }
 .column{
   flex:0 0 272px; scroll-snap-align:start;
@@ -111,6 +117,7 @@ button{font-family:var(--font-body);}
   font-family:var(--font-display); font-weight:700; font-size:0.86rem;
   color:var(--ink); padding:2px 2px 4px;
   border-bottom:2px solid var(--col-accent, var(--border));
+  position:sticky; top:0; z-index:5; background:var(--bg);
 }
 .column-head .dot{width:8px; height:8px; border-radius:50%; background:var(--col-accent, var(--ink-muted));}
 .column-head .count{

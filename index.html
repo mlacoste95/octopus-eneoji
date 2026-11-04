@@ -1138,6 +1138,10 @@ button{font-family:var(--font-body);}
 
     function buildPatchFromForm(){
       var newStage = document.getElementById("fStage").value;
+      var newRdvDate = document.getElementById("fRdvDate").value || null;
+      if(newStage === "nouveau" && newRdvDate){
+        newStage = "rdv_programme";
+      }
       var devisDateVal = document.getElementById("fDevisEnvoyeDate").value;
       var devisEnvoyeDate = devisDateVal ? parseDateInputToTs(devisDateVal) : (l.devisEnvoyeDate || null);
       if(newStage === "devis_envoye" && l.stage !== "devis_envoye" && !devisEnvoyeDate){
@@ -1155,8 +1159,8 @@ button{font-family:var(--font-body);}
         source: document.getElementById("fSource").value,
         mailLink: document.getElementById("fMailLink").value.trim(),
         createdAt: parseDateInputToTs(document.getElementById("fReceivedDate").value) || l.createdAt || Date.now(),
-        stage: document.getElementById("fStage").value,
-        rdvDate: document.getElementById("fRdvDate").value || null,
+        stage: newStage,
+        rdvDate: newRdvDate,
         crVisite: document.getElementById("fCrVisite").value.trim(),
         notes: document.getElementById("fNotes").value.trim(),
         updatedAt: Date.now()
@@ -1225,6 +1229,8 @@ button{font-family:var(--font-body);}
       var name = document.getElementById("fName").value.trim();
       if(!name){ document.getElementById("fName").focus(); return; }
       var now = Date.now();
+      var newRdvDate = document.getElementById("fRdvDate").value || null;
+      var finalStage = (targetStage === "nouveau" && newRdvDate) ? "rdv_programme" : targetStage;
       var data = {
         name: name,
         ville: document.getElementById("fVille").value.trim(),
@@ -1234,9 +1240,9 @@ button{font-family:var(--font-body);}
         equipment: readEquipment(),
         zone: document.getElementById("fZone").value,
         source: document.getElementById("fSource").value,
-        rdvDate: document.getElementById("fRdvDate").value || null,
+        rdvDate: newRdvDate,
         notes: document.getElementById("fNotes").value.trim(),
-        stage: targetStage,
+        stage: finalStage,
         createdAt: parseDateInputToTs(document.getElementById("fReceivedDate").value) || now, updatedAt: now,
         createdBy: myId || null
       };

@@ -782,6 +782,12 @@ button{font-family:var(--font-body);}
           });
         } else if(col.key === "nouveau"){
           items.sort(function(a,b){ return (a.createdAt||0) - (b.createdAt||0); });
+        } else if(col.key === "rdv_fait"){
+          items.sort(function(a,b){
+            var da = a.rdvDate ? new Date(a.rdvDate).getTime() : (a.createdAt||0);
+            var db2 = b.rdvDate ? new Date(b.rdvDate).getTime() : (b.createdAt||0);
+            return da - db2;
+          });
         } else if(col.key === "devis_envoye"){
           items.sort(function(a,b){
             var da = a.devisEnvoyeDate || Infinity;

@@ -921,6 +921,21 @@ button{font-family:var(--font-body);}
     });
   }
 
+  function showConfirm(message, onYes){
+    var ov = document.createElement("div");
+    ov.className = "annot-overlay";
+    ov.innerHTML =
+      '<div class="annot-panel" style="max-width:360px;">' +
+        '<p style="font-size:0.95rem; color:var(--ink); margin:0;">' + esc(message) + '</p>' +
+        '<div class="annot-actions"><button type="button" class="btn btn-ghost" id="confirmNo">Non</button><button type="button" class="btn btn-primary" id="confirmYes">Oui</button></div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    function finish(){ document.body.removeChild(ov); }
+    ov.addEventListener("click", function(e){ if(e.target === ov) finish(); });
+    ov.querySelector("#confirmNo").addEventListener("click", finish);
+    ov.querySelector("#confirmYes").addEventListener("click", function(){ finish(); onYes(); });
+  }
+
   function moveLead(id, newStage){
     var l = leads.find(function(x){ return x.id === id; });
     if(!l || l.stage === newStage) return;
@@ -1053,7 +1068,13 @@ button{font-family:var(--font-body);}
     }
     mailLinkInput.addEventListener("change", refreshMailLink);
     refreshMailLink();
-    dateInput.addEventListener("change", refreshGcal);
+    dateInput.addEventListener("change", function(){
+      refreshGcal();
+      if(dateInput.value){
+        var link = gcalLink(dateInput.value, "RDV Eneoji — " + (displayName(l) || "client"), "Équipement : " + (l.equipment||"—") + (l.phone ? "\nTél : " + l.phone : ""), addrInput.value.trim());
+        if(link) showConfirm("Ajouter ce RDV à Google Agenda ?", function(){ window.open(link, "_blank", "noopener"); });
+      }
+    });
     addrInput.addEventListener("change", function(){ refreshGcal(); refreshMaps(); });
     refreshGcal();
     refreshMaps();
@@ -1256,6 +1277,13 @@ button{font-family:var(--font-body);}
     document.getElementById("mClose").addEventListener("click", closeModal);
     document.getElementById("btnCancel").addEventListener("click", closeModal);
     wireEquipmentChips();
+    document.getElementById("fRdvDate").addEventListener("change", function(){
+      var v = document.getElementById("fRdvDate").value;
+      if(!v) return;
+      var title = "RDV Eneoji — " + ((document.getElementById("fPrenom").value.trim() + " " + document.getElementById("fNom").value.trim()).trim() || "client");
+      var link = gcalLink(v, title, "", document.getElementById("fAdresse").value.trim());
+      if(link) showConfirm("Ajouter ce RDV à Google Agenda ?", function(){ window.open(link, "_blank", "noopener"); });
+    });
     document.getElementById("btnCreate").addEventListener("click", function(){
       var prenom = document.getElementById("fPrenom").value.trim();
       var nom = document.getElementById("fNom").value.trim();

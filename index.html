@@ -249,6 +249,8 @@ button{font-family:var(--font-body);}
 @media (min-width:640px){ .modal{border-radius:16px;} }
 .modal h2{font-size:1.1rem; color:var(--brand);}
 .field{display:flex; flex-direction:column; gap:5px;}
+.field-row{display:flex; gap:10px;}
+.field-row .field{flex:1; min-width:0;}
 .field label{font-size:0.76rem; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em;}
 .field input, .field select, .field textarea{
   font-family:var(--font-body); font-size:0.92rem; color:var(--ink);
@@ -527,7 +529,7 @@ button{font-family:var(--font-body);}
   function matchesSearch(l){
     if(!searchQuery) return true;
     var haystack = [
-      l.name, l.ville, l.phone, l.email, l.adresse, l.notes, l.crVisite,
+      l.name, l.prenom, l.nom, l.ville, l.phone, l.email, l.adresse, l.notes, l.crVisite,
       toArray(l.equipment).join(" ")
     ].filter(Boolean).join(" ").toLowerCase();
     return haystack.indexOf(searchQuery) !== -1;
@@ -542,6 +544,20 @@ button{font-family:var(--font-body);}
     var d = document.createElement("div");
     d.textContent = s == null ? "" : String(s);
     return d.innerHTML;
+  }
+
+  function splitLegacyName(name){
+    name = (name || "").trim();
+    if(!name) return {prenom:"", nom:""};
+    var idx = name.lastIndexOf(" ");
+    if(idx === -1) return {prenom:name, nom:""};
+    return {prenom:name.slice(0, idx).trim(), nom:name.slice(idx + 1).trim()};
+  }
+  function displayName(l){
+    if(l.prenom || l.nom){
+      return ((l.prenom || "").trim() + " " + (l.nom || "").trim().toUpperCase()).trim();
+    }
+    return l.name || "";
   }
 
   function relTime(ts){
@@ -825,7 +841,7 @@ button{font-family:var(--font-body);}
           card.addEventListener("dragstart", function(e){ e.dataTransfer.setData("text/plain", l.id); });
           card.addEventListener("click", function(){ openDetail(l); });
           card.innerHTML =
-            '<div class="name">' + esc(l.name || "Sans nom") + (l.ville ? ' <span class="city">— ' + esc(l.ville) + '</span>' : '') + '</div>' +
+            '<div class="name">' + esc(displayName(l) || "Sans nom") + (l.ville ? ' <span class="city">— ' + esc(l.ville) + '</span>' : '') + '</div>' +
             '<div class="meta">' + (l.source ? '<span class="source-ico" title="' + esc(l.source) + '">' + (l.source === "Leads Engie" ? '<img src="' + ENGIE_LOGO + '" alt="Engie">' : l.source === "Google Ads" ? GOOGLE_G_ICON : (SOURCE_ICONS[l.source]||"")) + '</span>' : '') +
               (toArray(l.equipment).length ? toArray(l.equipment).map(function(e){ return '<span class="badge">' + esc(e) + '</span>'; }).join("") : '<span class="badge">—</span>') +
               (l.zone ? '<span class="zone-badge" style="background:' + zoneColor(l.zone) + '">' + esc(l.zone) + '</span>' : '') + '<span class="age">' + relTime(l.updatedAt) + '</span></div>' +
@@ -881,7 +897,7 @@ button{font-family:var(--font-body);}
     var rows = items.length
       ? items.map(function(l){
           return '<div class="hidden-list-row" data-id="' + esc(l.id) + '">' +
-            '<div><strong>' + esc(l.name || "Sans nom") + '</strong>' + (l.ville ? ' — ' + esc(l.ville) : '') + '</div>' +
+            '<div><strong>' + esc(displayName(l) || "Sans nom") + '</strong>' + (l.ville ? ' — ' + esc(l.ville) : '') + '</div>' +
             '<div class="hidden-list-meta">' + esc(toArray(l.equipment).join(", ")) + (l.phone ? ' · ' + esc(formatPhoneDisplay(l.phone)) : '') + '</div>' +
           '</div>';
         }).join("")
@@ -966,7 +982,11 @@ button{font-family:var(--font-body);}
     overlay.hidden = false;
     var visitMode = (l.stage === "rdv_programme" || l.stage === "rdv_fait");
 
-    var nameBlock = '<div class="field"><label>Nom du client</label><input id="fName" value="' + esc(l.name) + '"></div>';
+    var legacyName = splitLegacyName(l.name);
+    var nameBlock = '<div class="field-row">' +
+      '<div class="field"><label>Prénom</label><input id="fPrenom" value="' + esc(l.prenom != null ? l.prenom : legacyName.prenom) + '"></div>' +
+      '<div class="field"><label>Nom</label><input id="fNom" value="' + esc(l.nom != null ? l.nom : legacyName.nom) + '"></div>' +
+    '</div>';
     var crPhotoBlock =
       '<div class="field"><label>CR visite <span style="text-transform:none; font-weight:400;">(tout ce qui sert à faire le devis)</span></label><textarea id="fCrVisite" style="min-height:110px;">' + esc(l.crVisite) + '</textarea></div>' +
       '<div class="field"><label>Photos</label><div class="photo-grid" id="photoGrid"></div><input type="file" id="fPhotoInputCamera" accept="image/*" capture="environment" hidden><input type="file" id="fPhotoInputGallery" accept="image/*" multiple hidden></div>';
@@ -1018,7 +1038,7 @@ button{font-family:var(--font-body);}
     function refreshGcal(){
       var v = dateInput.value;
       if(!v){ gcalWrap.innerHTML = ""; return; }
-      var link = gcalLink(v, "RDV Eneoji — " + (l.name || "client"), "Équipement : " + (l.equipment||"—") + (l.phone ? "\nTél : " + l.phone : ""), addrInput.value.trim());
+      var link = gcalLink(v, "RDV Eneoji — " + (displayName(l) || "client"), "Équipement : " + (l.equipment||"—") + (l.phone ? "\nTél : " + l.phone : ""), addrInput.value.trim());
       gcalWrap.innerHTML = link ? '<a class="gcal-link" href="' + link + '" target="_blank" rel="noopener">📆 Ajouter à Google Agenda</a>' : "";
     }
     function refreshMaps(){
@@ -1155,7 +1175,9 @@ button{font-family:var(--font-body);}
       }
       return {
         devisEnvoyeDate: devisEnvoyeDate,
-        name: document.getElementById("fName").value.trim(),
+        prenom: document.getElementById("fPrenom").value.trim(),
+        nom: document.getElementById("fNom").value.trim(),
+        name: null,
         ville: document.getElementById("fVille").value.trim(),
         phone: document.getElementById("fPhone").value.trim(),
         adresse: document.getElementById("fAdresse").value.trim(),
@@ -1216,7 +1238,10 @@ button{font-family:var(--font-body);}
       '<button class="modal-close" id="mClose" aria-label="Fermer">×</button>' +
       '<h2>Nouveau lead' + (targetLabel ? ' — ' + esc(targetLabel) : '') + '</h2>' +
       '<div class="field"><label>Date de réception du lead</label><input type="date" id="fReceivedDate" value="' + toDateInputValue() + '"></div>' +
-      '<div class="field"><label>Nom du client</label><input id="fName" placeholder="Ex. Jean Dupont"></div>' +
+      '<div class="field-row">' +
+        '<div class="field"><label>Prénom</label><input id="fPrenom" placeholder="Ex. Jean"></div>' +
+        '<div class="field"><label>Nom</label><input id="fNom" placeholder="Ex. Dupont"></div>' +
+      '</div>' +
       '<div class="field"><label>Ville</label><input id="fVille" placeholder="Ex. Dax"></div>' +
       '<div class="field"><label>Zone</label><select id="fZone">' + zoneOptions() + '</select></div>' +
       '<div class="field"><label>Adresse précise</label><input id="fAdresse" placeholder="N°, rue, code postal et ville"></div>' +
@@ -1232,13 +1257,15 @@ button{font-family:var(--font-body);}
     document.getElementById("btnCancel").addEventListener("click", closeModal);
     wireEquipmentChips();
     document.getElementById("btnCreate").addEventListener("click", function(){
-      var name = document.getElementById("fName").value.trim();
-      if(!name){ document.getElementById("fName").focus(); return; }
+      var prenom = document.getElementById("fPrenom").value.trim();
+      var nom = document.getElementById("fNom").value.trim();
+      if(!prenom && !nom){ document.getElementById("fPrenom").focus(); return; }
       var now = Date.now();
       var newRdvDate = document.getElementById("fRdvDate").value || null;
       var finalStage = (targetStage === "nouveau" && newRdvDate) ? "rdv_programme" : targetStage;
       var data = {
-        name: name,
+        prenom: prenom,
+        nom: nom,
         ville: document.getElementById("fVille").value.trim(),
         phone: document.getElementById("fPhone").value.trim(),
         adresse: document.getElementById("fAdresse").value.trim(),

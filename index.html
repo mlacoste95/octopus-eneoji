@@ -62,6 +62,14 @@ button{font-family:var(--font-body);}
 
 .zone-filter{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;}
 .fab-new{display:none;}
+.new-lead-toast{
+  position:fixed; left:50%; transform:translateX(-50%);
+  bottom:max(18px, env(safe-area-inset-bottom,0px));
+  background:var(--accent); color:#fff; border:none; border-radius:999px;
+  padding:11px 18px; font-family:var(--font-body); font-weight:700; font-size:0.86rem;
+  box-shadow:0 6px 16px rgba(26,26,26,0.3); z-index:45; cursor:pointer;
+  display:flex; align-items:center; gap:6px; white-space:nowrap;
+}
 @media (max-width:640px){
   .topbar{ gap:10px; margin-bottom:14px; }
   .topbar h1{ font-size:1.1rem; }
@@ -888,6 +896,7 @@ button{font-family:var(--font-body);}
     var refusedCountEl = document.getElementById("refusedCount");
     if(acceptedCountEl) acceptedCountEl.textContent = "(" + leads.filter(function(l){ return l.stage === "devis_accepte"; }).length + ")";
     if(refusedCountEl) refusedCountEl.textContent = "(" + leads.filter(function(l){ return l.stage === "devis_refuse"; }).length + ")";
+    checkPendingNewLeadsVisibility();
   }
 
   function openHiddenStageList(stageKey, title){
@@ -935,6 +944,47 @@ button{font-family:var(--font-body);}
     ov.querySelector("#confirmNo").addEventListener("click", finish);
     ov.querySelector("#confirmYes").addEventListener("click", function(){ finish(); onYes(); });
   }
+
+  var seenLeadIds = null;
+  var pendingNewLeadIds = {};
+  var newLeadToastEl = null;
+  function pendingNewLeadCount(){ return Object.keys(pendingNewLeadIds).length; }
+  function renderNewLeadToast(){
+    var count = pendingNewLeadCount();
+    if(count === 0){
+      if(newLeadToastEl && newLeadToastEl.parentNode) newLeadToastEl.parentNode.removeChild(newLeadToastEl);
+      newLeadToastEl = null;
+      return;
+    }
+    if(!newLeadToastEl){
+      newLeadToastEl = document.createElement("button");
+      newLeadToastEl.type = "button";
+      newLeadToastEl.className = "new-lead-toast";
+      newLeadToastEl.addEventListener("click", function(){
+        var id = Object.keys(pendingNewLeadIds)[0];
+        var cardEl = id && board.querySelector('[data-lead-id="' + id + '"]');
+        if(cardEl) cardEl.scrollIntoView({behavior:"smooth", block:"center"});
+      });
+      document.body.appendChild(newLeadToastEl);
+    }
+    newLeadToastEl.textContent = "🆕 " + (count > 1 ? count + " nouveaux leads" : "Nouveau lead") + " — voir";
+  }
+  function addPendingNewLead(id){
+    pendingNewLeadIds[id] = true;
+    renderNewLeadToast();
+  }
+  function checkPendingNewLeadsVisibility(){
+    if(pendingNewLeadCount() === 0) return;
+    var boardRect = board.getBoundingClientRect();
+    Object.keys(pendingNewLeadIds).forEach(function(id){
+      var cardEl = board.querySelector('[data-lead-id="' + id + '"]');
+      if(!cardEl){ delete pendingNewLeadIds[id]; return; }
+      var r = cardEl.getBoundingClientRect();
+      if(r.top >= boardRect.top && r.bottom <= boardRect.bottom + 4) delete pendingNewLeadIds[id];
+    });
+    renderNewLeadToast();
+  }
+  board.addEventListener("scroll", checkPendingNewLeadsVisibility);
 
   function moveLead(id, newStage){
     var l = leads.find(function(x){ return x.id === id; });
@@ -1315,6 +1365,7 @@ button{font-family:var(--font-body);}
         db.collection("leads").add(data).then(function(ref){
           var l = leads.find(function(x){ return x.id === localId; });
           if(l) l.id = ref.id;
+          if(seenLeadIds) seenLeadIds[ref.id] = true;
         }).catch(function(err){
           leads = leads.filter(function(x){ return x.id !== localId; });
           render();
@@ -1386,7 +1437,15 @@ button{font-family:var(--font-body);}
       db = firebase.firestore();
       db.collection("leads").onSnapshot(function(snap){
         dbReady = true;
-        leads = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+        var newLeads = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+        if(seenLeadIds){
+          newLeads.forEach(function(l){
+            if(l.stage === "nouveau" && !seenLeadIds[l.id]) addPendingNewLead(l.id);
+          });
+        }
+        seenLeadIds = {};
+        newLeads.forEach(function(l){ seenLeadIds[l.id] = true; });
+        leads = newLeads;
         render();
       }, function(err){
         dbReady = true;

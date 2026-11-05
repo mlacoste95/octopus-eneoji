@@ -1104,7 +1104,7 @@ button{font-family:var(--font-body);}
     function refreshGcal(){
       var v = dateInput.value;
       if(!v){ gcalWrap.innerHTML = ""; return; }
-      var link = gcalLink(v, "RDV Eneoji — " + (displayName(l) || "client"), "Équipement : " + (l.equipment||"—") + (l.phone ? "\nTél : " + l.phone : ""), addrInput.value.trim());
+      var link = gcalLink(v, "RDV — " + (displayName(l) || "client"), "Équipement : " + (l.equipment||"—") + (l.phone ? "\nTél : " + l.phone : ""), addrInput.value.trim());
       gcalWrap.innerHTML = link ? '<a class="gcal-link" href="' + link + '" target="_blank" rel="noopener">📆 Ajouter à Google Agenda</a>' : "";
     }
     function refreshMaps(){
@@ -1122,7 +1122,7 @@ button{font-family:var(--font-body);}
     dateInput.addEventListener("change", function(){
       refreshGcal();
       if(dateInput.value){
-        var link = gcalLink(dateInput.value, "RDV Eneoji — " + (displayName(l) || "client"), "Équipement : " + (l.equipment||"—") + (l.phone ? "\nTél : " + l.phone : ""), addrInput.value.trim());
+        var link = gcalLink(dateInput.value, "RDV — " + (displayName(l) || "client"), "Équipement : " + (l.equipment||"—") + (l.phone ? "\nTél : " + l.phone : ""), addrInput.value.trim());
         if(link) showConfirm("Ajouter ce RDV à Google Agenda ?", function(){ window.open(link, "_blank", "noopener"); });
       }
     });
@@ -1331,7 +1331,7 @@ button{font-family:var(--font-body);}
     document.getElementById("fRdvDate").addEventListener("change", function(){
       var v = document.getElementById("fRdvDate").value;
       if(!v) return;
-      var title = "RDV Eneoji — " + ((document.getElementById("fPrenom").value.trim() + " " + document.getElementById("fNom").value.trim()).trim() || "client");
+      var title = "RDV — " + ((document.getElementById("fPrenom").value.trim() + " " + document.getElementById("fNom").value.trim()).trim() || "client");
       var link = gcalLink(v, title, "", document.getElementById("fAdresse").value.trim());
       if(link) showConfirm("Ajouter ce RDV à Google Agenda ?", function(){ window.open(link, "_blank", "noopener"); });
     });

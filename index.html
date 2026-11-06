@@ -1119,13 +1119,7 @@ button{font-family:var(--font-body);}
     }
     mailLinkInput.addEventListener("change", refreshMailLink);
     refreshMailLink();
-    dateInput.addEventListener("change", function(){
-      refreshGcal();
-      if(dateInput.value){
-        var link = gcalLink(dateInput.value, "RDV — " + (displayName(l) || "client"), "Équipement : " + (l.equipment||"—") + (l.phone ? "\nTél : " + l.phone : ""), addrInput.value.trim());
-        if(link) showConfirm("Ajouter ce RDV à Google Agenda ?", function(){ window.open(link, "_blank", "noopener"); });
-      }
-    });
+    dateInput.addEventListener("change", refreshGcal);
     addrInput.addEventListener("change", function(){ refreshGcal(); refreshMaps(); });
     refreshGcal();
     refreshMaps();
@@ -1277,7 +1271,16 @@ button{font-family:var(--font-body);}
       }
     }
     document.getElementById("btnSave").addEventListener("click", function(){
-      savePatch(buildPatchFromForm());
+      var patch = buildPatchFromForm();
+      var rdvChanged = patch.rdvDate && patch.rdvDate !== l.rdvDate;
+      var title = "RDV — " + (displayName(Object.assign({}, l, patch)) || "client");
+      var desc = "Équipement : " + (toArray(patch.equipment).join(", ") || "—") + (patch.phone ? "\nTél : " + patch.phone : "");
+      var addr = patch.adresse;
+      savePatch(patch);
+      if(rdvChanged){
+        var link = gcalLink(patch.rdvDate, title, desc, addr);
+        if(link) showConfirm("Lead enregistré. Ajouter ce RDV à Google Agenda ?", function(){ window.open(link, "_blank", "noopener"); });
+      }
     });
 
     var delBtn = document.getElementById("btnDelete");
@@ -1328,13 +1331,6 @@ button{font-family:var(--font-body);}
     document.getElementById("mClose").addEventListener("click", closeModal);
     document.getElementById("btnCancel").addEventListener("click", closeModal);
     wireEquipmentChips();
-    document.getElementById("fRdvDate").addEventListener("change", function(){
-      var v = document.getElementById("fRdvDate").value;
-      if(!v) return;
-      var title = "RDV — " + ((document.getElementById("fPrenom").value.trim() + " " + document.getElementById("fNom").value.trim()).trim() || "client");
-      var link = gcalLink(v, title, "", document.getElementById("fAdresse").value.trim());
-      if(link) showConfirm("Ajouter ce RDV à Google Agenda ?", function(){ window.open(link, "_blank", "noopener"); });
-    });
     document.getElementById("btnCreate").addEventListener("click", function(){
       var prenom = document.getElementById("fPrenom").value.trim();
       var nom = document.getElementById("fNom").value.trim();
@@ -1362,6 +1358,12 @@ button{font-family:var(--font-body);}
       leads.push(Object.assign({id: localId}, data));
       render();
       closeModal();
+      if(newRdvDate){
+        var title = "RDV — " + ((prenom + " " + nom).trim() || "client");
+        var desc = "Équipement : " + (toArray(data.equipment).join(", ") || "—") + (data.phone ? "\nTél : " + data.phone : "");
+        var link = gcalLink(newRdvDate, title, desc, data.adresse);
+        if(link) showConfirm("Lead enregistré. Ajouter ce RDV à Google Agenda ?", function(){ window.open(link, "_blank", "noopener"); });
+      }
       if(db && canWrite){
         db.collection("leads").add(data).then(function(ref){
           var l = leads.find(function(x){ return x.id === localId; });

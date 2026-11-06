@@ -285,6 +285,8 @@ button{font-family:var(--font-body);}
 }
 .modal-wrap{position:relative;}
 .meta-row{font-size:0.74rem; color:var(--ink-muted);}
+.save-status{font-size:0.72rem; font-weight:700; color:var(--ink-muted); margin-left:8px; vertical-align:middle;}
+.save-status.ok{color:var(--success);}
 .auth-gate{
   min-height:70vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
   gap:14px; text-align:center; padding:24px;
@@ -1074,20 +1076,27 @@ button{font-family:var(--font-body);}
       '<div class="field"><label>Date d\'envoi du devis <span style="text-transform:none; font-weight:400;">(automatique, modifiable si besoin)</span></label><input type="date" id="fDevisEnvoyeDate" value="' + (l.devisEnvoyeDate ? toDateInputValue(l.devisEnvoyeDate) : "") + '"></div>';
     var notesBlock = '<div class="field"><label>Notes</label><textarea id="fNotes">' + esc(l.notes) + '</textarea></div>';
 
-    modal.innerHTML =
+    modal.innerHTML = '<div id="formWrap">' +
       '<button class="modal-close" id="mClose" aria-label="Fermer">×</button>' +
-      '<h2>Modifier le lead</h2>' +
+      '<h2>Modifier le lead <span class="save-status" id="saveStatus"></span></h2>' +
       nameBlock +
       (visitMode ? (crPhotoBlock + generalBlock + notesBlock) : (generalBlock + crPhotoBlock + notesBlock)) +
       (l.stage === "rdv_programme" ? '<button type="button" class="btn btn-primary" id="btnRdvDone" style="width:100%; justify-content:center;">✓ RDV terminé</button>' : '') +
       '<div class="meta-row">Créé ' + relTime(l.createdAt) + ' &middot; mis à jour ' + relTime(l.updatedAt) + '</div>' +
       '<div class="modal-actions">' +
         '<button class="btn btn-danger" id="btnDelete">Supprimer</button>' +
-        '<div class="right"><button class="btn btn-ghost" id="btnCancel">Annuler</button><button class="btn btn-primary" id="btnSave">Enregistrer</button></div>' +
-      '</div>';
+        '<div class="right"><button class="btn btn-ghost" id="btnCancel">Annuler</button><button class="btn btn-primary" id="btnSave">Fermer</button></div>' +
+      '</div>' +
+    '</div>';
 
-    document.getElementById("mClose").addEventListener("click", closeModal);
-    document.getElementById("btnCancel").addEventListener("click", closeModal);
+    var formWrap = document.getElementById("formWrap");
+    var saveStatusEl = document.getElementById("saveStatus");
+    var autoSaveTimer = null;
+    var lastOfferedRdvDate = l.rdvDate || null;
+
+    function flushAutoSave(){ clearTimeout(autoSaveTimer); doAutoSave(); }
+    document.getElementById("mClose").addEventListener("click", function(){ flushAutoSave(); closeModal(); });
+    document.getElementById("btnCancel").addEventListener("click", function(){ flushAutoSave(); closeModal(); });
     wireEquipmentChips();
 
     var btnRdvDone = document.getElementById("btnRdvDone");
@@ -1270,17 +1279,39 @@ button{font-family:var(--font-body);}
         });
       }
     }
-    document.getElementById("btnSave").addEventListener("click", function(){
+    function doAutoSave(){
       var patch = buildPatchFromForm();
-      var rdvChanged = patch.rdvDate && patch.rdvDate !== l.rdvDate;
-      var title = "RDV — " + (displayName(Object.assign({}, l, patch)) || "client");
-      var desc = "Équipement : " + (toArray(patch.equipment).join(", ") || "—") + (patch.phone ? "\nTél : " + patch.phone : "");
-      var addr = patch.adresse;
-      savePatch(patch);
-      if(rdvChanged){
-        var link = gcalLink(patch.rdvDate, title, desc, addr);
-        if(link) showConfirm("Lead enregistré. Ajouter ce RDV à Google Agenda ?", function(){ window.open(link, "_blank", "noopener"); });
+      var rdvChanged = patch.rdvDate && patch.rdvDate !== lastOfferedRdvDate;
+      Object.assign(l, patch);
+      render();
+      if(saveStatusEl){ saveStatusEl.textContent = "Enregistrement…"; saveStatusEl.classList.remove("ok"); }
+      if(db && canWrite){
+        db.collection("leads").doc(l.id).update(patch).then(function(){
+          if(saveStatusEl){ saveStatusEl.textContent = "✓ Enregistré"; saveStatusEl.classList.add("ok"); }
+        }).catch(function(err){
+          if(saveStatusEl) saveStatusEl.textContent = "";
+          if(err && err.code === "permission-denied") showBanner("Lecture seule : tu n'as pas les droits pour modifier ce tableau.");
+        });
       }
+      if(rdvChanged){
+        lastOfferedRdvDate = patch.rdvDate;
+        var title = "RDV — " + (displayName(Object.assign({}, l, patch)) || "client");
+        var desc = "Équipement : " + (toArray(patch.equipment).join(", ") || "—") + (patch.phone ? "\nTél : " + patch.phone : "");
+        var link = gcalLink(patch.rdvDate, title, desc, patch.adresse);
+        if(link) showConfirm("Ajouter ce RDV à Google Agenda ?", function(){ window.open(link, "_blank", "noopener"); });
+      }
+    }
+    formWrap.addEventListener("input", function(){
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(doAutoSave, 600);
+    });
+    formWrap.addEventListener("change", function(){
+      clearTimeout(autoSaveTimer);
+      doAutoSave();
+    });
+    document.getElementById("btnSave").addEventListener("click", function(){
+      flushAutoSave();
+      closeModal();
     });
 
     var delBtn = document.getElementById("btnDelete");
@@ -1309,9 +1340,9 @@ button{font-family:var(--font-body);}
     var targetStage = initialStage || "nouveau";
     var targetLabel = (COLUMNS.find(function(c){ return c.key === targetStage; }) || {}).label || "";
     overlay.hidden = false;
-    modal.innerHTML =
+    modal.innerHTML = '<div id="formWrap">' +
       '<button class="modal-close" id="mClose" aria-label="Fermer">×</button>' +
-      '<h2>Nouveau lead' + (targetLabel ? ' — ' + esc(targetLabel) : '') + '</h2>' +
+      '<h2>Nouveau lead' + (targetLabel ? ' — ' + esc(targetLabel) : '') + ' <span class="save-status" id="saveStatus"></span></h2>' +
       '<div class="field"><label>Date de réception du lead</label><input type="date" id="fReceivedDate" value="' + toDateInputValue() + '"></div>' +
       '<div class="field-row">' +
         '<div class="field"><label>Prénom</label><input id="fPrenom" placeholder="Ex. Jean"></div>' +
@@ -1326,21 +1357,26 @@ button{font-family:var(--font-body);}
       '<div class="field"><label>Source</label><select id="fSource">' + sourceOptions() + '</select></div>' +
       '<div class="field"><label>Date du RDV (si connue)</label><input type="datetime-local" id="fRdvDate"></div>' +
       '<div class="field"><label>Notes</label><textarea id="fNotes" placeholder="Contexte, besoin…"></textarea></div>' +
-      '<div class="modal-actions"><div></div><div class="right"><button class="btn btn-ghost" id="btnCancel">Annuler</button><button class="btn btn-primary" id="btnCreate">Ajouter</button></div></div>';
+      '<div class="modal-actions"><div></div><div class="right"><button class="btn btn-ghost" id="btnCancel">Annuler</button><button class="btn btn-primary" id="btnCreate">Fermer</button></div></div>' +
+    '</div>';
 
-    document.getElementById("mClose").addEventListener("click", closeModal);
-    document.getElementById("btnCancel").addEventListener("click", closeModal);
+    var formWrap = document.getElementById("formWrap");
     wireEquipmentChips();
-    document.getElementById("btnCreate").addEventListener("click", function(){
-      var prenom = document.getElementById("fPrenom").value.trim();
-      var nom = document.getElementById("fNom").value.trim();
-      if(!prenom && !nom){ document.getElementById("fPrenom").focus(); return; }
-      var now = Date.now();
+
+    var saveStatusEl = document.getElementById("saveStatus");
+    var autoSaveTimer = null;
+    var createdLeadId = null;
+    var creating = false;
+    var pendingPatchAfterCreate = null;
+    var cancelledAfterCreate = false;
+    var lastOfferedRdvDate = null;
+
+    function getFormData(){
       var newRdvDate = document.getElementById("fRdvDate").value || null;
       var finalStage = (targetStage === "nouveau" && newRdvDate) ? "rdv_programme" : targetStage;
-      var data = {
-        prenom: prenom,
-        nom: nom,
+      return {
+        prenom: document.getElementById("fPrenom").value.trim(),
+        nom: document.getElementById("fNom").value.trim(),
         ville: document.getElementById("fVille").value.trim(),
         phone: document.getElementById("fPhone").value.trim(),
         adresse: document.getElementById("fAdresse").value.trim(),
@@ -1350,31 +1386,120 @@ button{font-family:var(--font-body);}
         source: document.getElementById("fSource").value,
         rdvDate: newRdvDate,
         notes: document.getElementById("fNotes").value.trim(),
-        stage: finalStage,
-        createdAt: parseDateInputToTs(document.getElementById("fReceivedDate").value) || now, updatedAt: now,
-        createdBy: myId || null
+        stage: finalStage
       };
-      var localId = "tmp_" + now;
-      leads.push(Object.assign({id: localId}, data));
-      render();
-      closeModal();
-      if(newRdvDate){
-        var title = "RDV — " + ((prenom + " " + nom).trim() || "client");
-        var desc = "Équipement : " + (toArray(data.equipment).join(", ") || "—") + (data.phone ? "\nTél : " + data.phone : "");
-        var link = gcalLink(newRdvDate, title, desc, data.adresse);
-        if(link) showConfirm("Lead enregistré. Ajouter ce RDV à Google Agenda ?", function(){ window.open(link, "_blank", "noopener"); });
+    }
+    function hasAnyData(d){
+      return !!(d.prenom || d.nom || d.phone || d.ville || d.adresse || d.email || d.notes || d.rdvDate);
+    }
+    function offerCalendarIfNeeded(d){
+      if(d.rdvDate && d.rdvDate !== lastOfferedRdvDate){
+        lastOfferedRdvDate = d.rdvDate;
+        var title = "RDV — " + ((d.prenom + " " + d.nom).trim() || "client");
+        var desc = "Équipement : " + (toArray(d.equipment).join(", ") || "—") + (d.phone ? "\nTél : " + d.phone : "");
+        var link = gcalLink(d.rdvDate, title, desc, d.adresse);
+        if(link) showConfirm("Ajouter ce RDV à Google Agenda ?", function(){ window.open(link, "_blank", "noopener"); });
       }
-      if(db && canWrite){
+    }
+    function doAutoSave(){
+      var d = getFormData();
+      if(!hasAnyData(d)) return;
+      var now = Date.now();
+      if(saveStatusEl){ saveStatusEl.textContent = "Enregistrement…"; saveStatusEl.classList.remove("ok"); }
+      if(creating){
+        var lxPending = leads.find(function(x){ return x.id === createdLeadId; });
+        var patchPending = Object.assign({}, d, {updatedAt: now});
+        if(lxPending) Object.assign(lxPending, patchPending);
+        render();
+        pendingPatchAfterCreate = patchPending;
+        return;
+      }
+      if(!createdLeadId){
+        if(!db || !canWrite) return;
+        creating = true;
+        var data = Object.assign({}, d, {
+          createdAt: parseDateInputToTs(document.getElementById("fReceivedDate").value) || now,
+          updatedAt: now,
+          createdBy: myId || null
+        });
+        var localId = "tmp_" + now;
+        createdLeadId = localId;
+        leads.push(Object.assign({id: localId}, data));
+        render();
         db.collection("leads").add(data).then(function(ref){
-          var l = leads.find(function(x){ return x.id === localId; });
-          if(l) l.id = ref.id;
+          creating = false;
+          if(cancelledAfterCreate){
+            db.collection("leads").doc(ref.id).delete().catch(function(){});
+            return;
+          }
+          var lx = leads.find(function(x){ return x.id === localId; });
+          if(lx) lx.id = ref.id;
+          if(createdLeadId === localId) createdLeadId = ref.id;
           if(seenLeadIds) seenLeadIds[ref.id] = true;
+          if(pendingPatchAfterCreate){
+            var p = pendingPatchAfterCreate;
+            pendingPatchAfterCreate = null;
+            db.collection("leads").doc(ref.id).update(p).then(function(){
+              if(saveStatusEl){ saveStatusEl.textContent = "✓ Enregistré"; saveStatusEl.classList.add("ok"); }
+              offerCalendarIfNeeded(getFormData());
+            }).catch(function(err){
+              if(saveStatusEl) saveStatusEl.textContent = "";
+              if(err && err.code === "permission-denied") showBanner("Lecture seule : tu n'as pas les droits pour modifier ce tableau.");
+            });
+          } else {
+            if(saveStatusEl){ saveStatusEl.textContent = "✓ Enregistré"; saveStatusEl.classList.add("ok"); }
+            offerCalendarIfNeeded(d);
+          }
         }).catch(function(err){
+          creating = false;
           leads = leads.filter(function(x){ return x.id !== localId; });
+          createdLeadId = null;
           render();
+          if(saveStatusEl) saveStatusEl.textContent = "";
           if(err && err.code === "permission-denied") showBanner("Lecture seule : tu n'as pas les droits pour ajouter un lead.");
         });
+      } else {
+        var lx = leads.find(function(x){ return x.id === createdLeadId; });
+        var patch = Object.assign({}, d, {updatedAt: now});
+        if(lx) Object.assign(lx, patch);
+        render();
+        if(db && canWrite){
+          db.collection("leads").doc(createdLeadId).update(patch).then(function(){
+            if(saveStatusEl){ saveStatusEl.textContent = "✓ Enregistré"; saveStatusEl.classList.add("ok"); }
+            offerCalendarIfNeeded(d);
+          }).catch(function(err){
+            if(saveStatusEl) saveStatusEl.textContent = "";
+            if(err && err.code === "permission-denied") showBanner("Lecture seule : tu n'as pas les droits pour modifier ce tableau.");
+          });
+        }
       }
+    }
+    function flushAutoSave(){ clearTimeout(autoSaveTimer); doAutoSave(); }
+    formWrap.addEventListener("input", function(){
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(doAutoSave, 600);
+    });
+    formWrap.addEventListener("change", function(){
+      clearTimeout(autoSaveTimer);
+      doAutoSave();
+    });
+
+    document.getElementById("mClose").addEventListener("click", function(){ flushAutoSave(); closeModal(); });
+    document.getElementById("btnCreate").addEventListener("click", function(){ flushAutoSave(); closeModal(); });
+    document.getElementById("btnCancel").addEventListener("click", function(){
+      clearTimeout(autoSaveTimer);
+      pendingPatchAfterCreate = null;
+      if(createdLeadId){
+        var idToDelete = createdLeadId;
+        leads = leads.filter(function(x){ return x.id !== idToDelete; });
+        render();
+        if(String(idToDelete).indexOf("tmp_") === 0){
+          cancelledAfterCreate = true;
+        } else if(db && canWrite){
+          db.collection("leads").doc(idToDelete).delete().catch(function(){});
+        }
+      }
+      closeModal();
     });
   }
 

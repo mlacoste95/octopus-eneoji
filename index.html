@@ -849,7 +849,7 @@ button{font-family:var(--font-body);}
         var a = activePointers[ids[0]], b = activePointers[ids[1]];
         return Math.sqrt((a.x-b.x)*(a.x-b.x) + (a.y-b.y)*(a.y-b.y));
       }
-      var TRACE_EPSILON = 18;
+      var TRACE_EPSILON = 50;
       var TRACE_TOOLS = {goulotte:1, elec:1, condensats:1};
       function renderTracePreview(){
         previewCtx.clearRect(0, 0, w, h);

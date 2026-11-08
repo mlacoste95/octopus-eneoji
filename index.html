@@ -652,30 +652,9 @@ button{font-family:var(--font-body);}
     ctx.save();
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     ctx.beginPath(); pts.forEach(function(p,i){ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
-    ctx.strokeStyle = "#C7C7C7"; ctx.lineWidth = 11; ctx.stroke();
+    ctx.strokeStyle = "#D2D2D2"; ctx.lineWidth = 12; ctx.stroke();
     ctx.beginPath(); pts.forEach(function(p,i){ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
-    ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = 7; ctx.stroke();
-    var tickSpacing = 16, distSinceTick = 0;
-    for(var i=1;i<pts.length;i++){
-      var a = pts[i-1], b = pts[i];
-      var dx = b.x - a.x, dy = b.y - a.y;
-      var segLen = Math.sqrt(dx*dx + dy*dy);
-      if(segLen < 0.001) continue;
-      var ux = dx/segLen, uy = dy/segLen;
-      var nx = -uy, ny = ux;
-      var pos = 0;
-      while(distSinceTick + (segLen - pos) >= tickSpacing){
-        pos += (tickSpacing - distSinceTick);
-        distSinceTick = 0;
-        var tx = a.x + ux*pos, ty = a.y + uy*pos;
-        ctx.beginPath();
-        ctx.moveTo(tx - nx*5, ty - ny*5);
-        ctx.lineTo(tx + nx*5, ty + ny*5);
-        ctx.strokeStyle = "#9A9A9A"; ctx.lineWidth = 2;
-        ctx.stroke();
-      }
-      distSinceTick += (segLen - pos);
-    }
+    ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = 9; ctx.stroke();
     ctx.restore();
   }
 

@@ -626,9 +626,9 @@ button{font-family:var(--font-body);}
     ctx.save();
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     ctx.beginPath(); pts.forEach(function(p,i){ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
-    ctx.strokeStyle = "#9A9A9A"; ctx.lineWidth = 11; ctx.stroke();
+    ctx.strokeStyle = "#C7C7C7"; ctx.lineWidth = 11; ctx.stroke();
     ctx.beginPath(); pts.forEach(function(p,i){ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
-    ctx.strokeStyle = "#F2F2F2"; ctx.lineWidth = 7; ctx.stroke();
+    ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = 7; ctx.stroke();
     var tickSpacing = 16, distSinceTick = 0;
     for(var i=1;i<pts.length;i++){
       var a = pts[i-1], b = pts[i];

@@ -832,12 +832,14 @@ button{font-family:var(--font-body);}
         previewCtx.stroke();
       }
       var STAMP_TOOLS = {stampUE:"UE", stampUI:"UI", stampPAC:"PAC", stampBT:"BT"};
+      var movingStamp = false, moveStart = null;
       previewCanvas.addEventListener("pointerdown", function(e){
         var pt = toCanvasPoint(e);
         activePointers[e.pointerId] = pt;
         previewCanvas.setPointerCapture(e.pointerId);
 
         if(Object.keys(activePointers).length >= 2 && selectedStamp){
+          movingStamp = false;
           drawing = false;
           pinchStartDist = pointerDist();
           pinchStartScale = selectedStamp.scale;
@@ -848,11 +850,12 @@ button{font-family:var(--font-body);}
           var hit = hitTestStamp(pt);
           if(hit){
             selectedStamp = hit;
-            renderStampsLayer();
-            return;
+          } else {
+            selectedStamp = {type: STAMP_TOOLS[tool], x: pt.x, y: pt.y, scale: 1, color: color};
+            stamps.push(selectedStamp);
           }
-          selectedStamp = {type: STAMP_TOOLS[tool], x: pt.x, y: pt.y, scale: 1, color: color};
-          stamps.push(selectedStamp);
+          movingStamp = true;
+          moveStart = {x: pt.x, y: pt.y, stampX: selectedStamp.x, stampY: selectedStamp.y};
           renderStampsLayer();
           return;
         }
@@ -878,6 +881,13 @@ button{font-family:var(--font-body);}
           return;
         }
 
+        if(movingStamp && selectedStamp && Object.keys(activePointers).length === 1){
+          selectedStamp.x = moveStart.stampX + (pt.x - moveStart.x);
+          selectedStamp.y = moveStart.stampY + (pt.y - moveStart.y);
+          renderStampsLayer();
+          return;
+        }
+
         if(!drawing) return;
         if(tool === "goulotte"){
           goulottePoints.push(pt);
@@ -899,6 +909,7 @@ button{font-family:var(--font-body);}
       function endStroke(e){
         delete activePointers[e.pointerId];
         if(Object.keys(activePointers).length < 2) pinchStartDist = null;
+        movingStamp = false;
         if(tool === "goulotte" && goulottePoints.length > 1){
           previewCtx.clearRect(0, 0, w, h);
           drawGoulotte(drawCtx, simplifyPath(goulottePoints, GOULOTTE_EPSILON));
@@ -910,6 +921,7 @@ button{font-family:var(--font-body);}
       previewCanvas.addEventListener("pointercancel", function(e){
         delete activePointers[e.pointerId];
         if(Object.keys(activePointers).length < 2) pinchStartDist = null;
+        movingStamp = false;
         previewCtx.clearRect(0, 0, w, h);
         goulottePoints = [];
         drawing = false;

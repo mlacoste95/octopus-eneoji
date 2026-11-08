@@ -210,6 +210,7 @@ button{font-family:var(--font-body);}
   line-height:1; white-space:nowrap;
 }
 .annot-tool-btn.active{border-color:var(--ink); color:var(--ink); background:var(--surface-2);}
+.annot-tool-icon{vertical-align:middle; margin-right:3px;}
 .annot-clear{
   margin-left:auto; font-size:0.8rem; font-weight:700; color:var(--ink-soft);
   background:none; border:1px solid var(--border); border-radius:8px; padding:6px 10px; cursor:pointer;
@@ -723,10 +724,14 @@ button{font-family:var(--font-body);}
               return '<button type="button" class="annot-swatch' + (i===0?' active':'') + '" data-color="' + c + '" style="background:' + c + '" aria-label="Couleur"></button>';
             }).join("") +
             '<button type="button" class="annot-tool-btn" id="annotEraser" title="Gomme">🧽 Gomme</button>' +
-            '<button type="button" class="annot-tool-btn" id="annotStampUE" title="Unité extérieure">▭ UE</button>' +
-            '<button type="button" class="annot-tool-btn" id="annotStampUI" title="Unité intérieure">▭ UI</button>' +
-            '<button type="button" class="annot-tool-btn" id="annotStampPAC" title="Module intérieur PAC">▭ PAC</button>' +
-            '<button type="button" class="annot-tool-btn" id="annotStampBT" title="Ballon thermodynamique">⬭ BT</button>' +
+            '<button type="button" class="annot-tool-btn" id="annotStampUE" title="Unité extérieure">' +
+              '<svg class="annot-tool-icon" width="20" height="14" viewBox="0 0 40 28"><rect x="1.5" y="1.5" width="37" height="25" rx="4" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="12" cy="14" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/></svg> UE</button>' +
+            '<button type="button" class="annot-tool-btn" id="annotStampUI" title="Unité intérieure">' +
+              '<svg class="annot-tool-icon" width="24" height="8" viewBox="0 0 48 16"><rect x="1.5" y="1.5" width="45" height="13" rx="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/></svg> UI</button>' +
+            '<button type="button" class="annot-tool-btn" id="annotStampPAC" title="Module intérieur PAC">' +
+              '<svg class="annot-tool-icon" width="12" height="18" viewBox="0 0 22 34"><rect x="1.5" y="1.5" width="19" height="31" rx="4" fill="none" stroke="currentColor" stroke-width="2.4"/></svg> PAC</button>' +
+            '<button type="button" class="annot-tool-btn" id="annotStampBT" title="Ballon thermodynamique">' +
+              '<svg class="annot-tool-icon" width="10" height="18" viewBox="0 0 20 36"><rect x="1.5" y="1.5" width="17" height="33" rx="8.5" fill="none" stroke="currentColor" stroke-width="2.4"/></svg> BT</button>' +
             '<button type="button" class="annot-tool-btn" id="annotGoulotte" title="Goulotte">╱ Goulotte</button>' +
             '<button type="button" class="annot-clear" id="annotClear">Tout effacer</button>' +
           '</div>' +

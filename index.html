@@ -679,9 +679,9 @@ button{font-family:var(--font-body);}
     ctx.save();
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     ctx.beginPath(); pts.forEach(function(p,i){ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
-    ctx.strokeStyle = "#D2D2D2"; ctx.lineWidth = 12; ctx.stroke();
+    ctx.strokeStyle = "#D2D2D2"; ctx.lineWidth = 18; ctx.stroke();
     ctx.beginPath(); pts.forEach(function(p,i){ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
-    ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = 9; ctx.stroke();
+    ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = 14; ctx.stroke();
     ctx.restore();
   }
 
@@ -779,7 +779,7 @@ button{font-family:var(--font-body);}
         var pts = simplifyPath(goulottePoints, GOULOTTE_EPSILON);
         previewCtx.beginPath();
         pts.forEach(function(p, i){ if(i===0) previewCtx.moveTo(p.x, p.y); else previewCtx.lineTo(p.x, p.y); });
-        previewCtx.strokeStyle = "#B7B7B7"; previewCtx.lineWidth = 10;
+        previewCtx.strokeStyle = "#B7B7B7"; previewCtx.lineWidth = 16;
         previewCtx.lineCap = "round"; previewCtx.lineJoin = "round";
         previewCtx.stroke();
       }

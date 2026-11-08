@@ -196,6 +196,7 @@ button{font-family:var(--font-body);}
 .annot-stage canvas{position:absolute; top:0; left:0; width:100%; height:100%; display:block; border-radius:10px;}
 #annotBase{background:#111;}
 #annotDraw{pointer-events:none;}
+#annotStamps{pointer-events:none;}
 #annotPreview{pointer-events:auto; touch-action:none; cursor:crosshair;}
 .annot-tools{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
 .annot-swatch{
@@ -599,54 +600,61 @@ button{font-family:var(--font-body);}
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
   }
-  function drawUEStamp(ctx, x, y, color){
-    var w2 = 76, h2 = 48;
+  var STAMP_BASE_SIZES = {UE:{w:100,h:64}, UI:{w:124,h:38}, PAC:{w:140,h:78}, BT:{w:54,h:110}};
+  function drawUEStamp(ctx, x, y, color, scale){
+    scale = scale || 1;
+    var w2 = 100*scale, h2 = 64*scale;
     ctx.save();
     ctx.translate(x - w2/2, y - h2/2);
-    ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = color; ctx.lineWidth = 2.5;
-    annotRoundRect(ctx, 0, 0, w2, h2, 8); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.arc(21, 24, 14, 0, Math.PI*2); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(10, 24); ctx.lineTo(32, 24); ctx.moveTo(21, 13); ctx.lineTo(21, 35); ctx.stroke();
-    ctx.fillStyle = color; ctx.font = "bold 15px Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("UE", 54, 24);
+    ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = color; ctx.lineWidth = 2.5*scale;
+    annotRoundRect(ctx, 0, 0, w2, h2, 8*scale); ctx.fill(); ctx.stroke();
+    var fanR = 17*scale, fanCx = w2*0.28, fanCy = h2/2;
+    ctx.beginPath(); ctx.arc(fanCx, fanCy, fanR, 0, Math.PI*2); ctx.strokeStyle = color; ctx.lineWidth = 2*scale; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(fanCx-fanR, fanCy); ctx.lineTo(fanCx+fanR, fanCy); ctx.moveTo(fanCx, fanCy-fanR); ctx.lineTo(fanCx, fanCy+fanR); ctx.stroke();
+    ctx.fillStyle = color; ctx.font = "bold " + Math.round(18*scale) + "px Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("UE", w2*0.72, h2/2);
     ctx.restore();
   }
-  function drawUIStamp(ctx, x, y, color){
-    var w2 = 94, h2 = 28;
+  function drawUIStamp(ctx, x, y, color, scale){
+    scale = scale || 1;
+    var w2 = 124*scale, h2 = 38*scale;
     ctx.save();
     ctx.translate(x - w2/2, y - h2/2);
-    ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = color; ctx.lineWidth = 2.5;
-    annotRoundRect(ctx, 0, 0, w2, h2, 13); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = color; ctx.font = "bold 14px Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("UI", w2/2, h2/2 + 1);
+    ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = color; ctx.lineWidth = 2.5*scale;
+    annotRoundRect(ctx, 0, 0, w2, h2, 13*scale); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = color; ctx.font = "bold " + Math.round(17*scale) + "px Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("UI", w2/2, h2/2 + 1*scale);
     ctx.restore();
   }
-  function drawPACModuleStamp(ctx, x, y, color){
-    var w2 = 104, h2 = 58;
+  function drawPACModuleStamp(ctx, x, y, color, scale){
+    scale = scale || 1;
+    var w2 = 140*scale, h2 = 78*scale;
     ctx.save();
     ctx.translate(x - w2/2, y - h2/2);
-    ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = color; ctx.lineWidth = 2.5;
-    annotRoundRect(ctx, 0, 0, w2, h2, 9); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = color; ctx.font = "bold 15px Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = color; ctx.lineWidth = 2.5*scale;
+    annotRoundRect(ctx, 0, 0, w2, h2, 9*scale); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = color; ctx.font = "bold " + Math.round(19*scale) + "px Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText("PAC", w2/2, h2/2);
     ctx.restore();
   }
-  function drawBTStamp(ctx, x, y, color){
-    var w2 = 40, h2 = 82, r = w2/2;
+  function drawBTStamp(ctx, x, y, color, scale){
+    scale = scale || 1;
+    var w2 = 54*scale, h2 = 110*scale, r = w2/2;
     ctx.save();
     ctx.translate(x - w2/2, y - h2/2);
-    ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = color; ctx.lineWidth = 2.5;
+    ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = color; ctx.lineWidth = 2.5*scale;
     ctx.beginPath();
     ctx.arc(r, r, r, Math.PI, 0);
     ctx.lineTo(w2, h2 - r);
     ctx.arc(r, h2 - r, r, 0, Math.PI);
     ctx.closePath();
     ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(4, r + 10); ctx.lineTo(w2 - 4, r + 10); ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
-    ctx.fillStyle = color; ctx.font = "bold 12px Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("BT", r, h2/2 + 8);
+    ctx.beginPath(); ctx.moveTo(4*scale, r + 12*scale); ctx.lineTo(w2 - 4*scale, r + 12*scale); ctx.strokeStyle = color; ctx.lineWidth = 1.5*scale; ctx.stroke();
+    ctx.fillStyle = color; ctx.font = "bold " + Math.round(15*scale) + "px Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("BT", r, h2/2 + 10*scale);
     ctx.restore();
   }
+  var STAMP_DRAWERS = {UE: drawUEStamp, UI: drawUIStamp, PAC: drawPACModuleStamp, BT: drawBTStamp};
   function simplifyPath(points, epsilon){
     if(points.length < 3) return points.slice();
     function perpDist(p, a, b){
@@ -707,6 +715,7 @@ button{font-family:var(--font-body);}
           '<div class="annot-stage" style="width:' + dispW + 'px; height:' + dispH + 'px;">' +
             '<canvas id="annotBase" width="' + w + '" height="' + h + '"></canvas>' +
             '<canvas id="annotDraw" width="' + w + '" height="' + h + '"></canvas>' +
+            '<canvas id="annotStamps" width="' + w + '" height="' + h + '"></canvas>' +
             '<canvas id="annotPreview" width="' + w + '" height="' + h + '"></canvas>' +
           '</div>' +
           '<div class="annot-tools">' +
@@ -730,9 +739,11 @@ button{font-family:var(--font-body);}
 
       var baseCanvas = ov.querySelector("#annotBase");
       var drawCanvas = ov.querySelector("#annotDraw");
+      var stampsCanvas = ov.querySelector("#annotStamps");
       var previewCanvas = ov.querySelector("#annotPreview");
       var baseCtx = baseCanvas.getContext("2d");
       var drawCtx = drawCanvas.getContext("2d");
+      var stampsCtx = stampsCanvas.getContext("2d");
       var previewCtx = previewCanvas.getContext("2d");
       baseCtx.drawImage(img, 0, 0, w, h);
 
@@ -748,6 +759,7 @@ button{font-family:var(--font-body);}
       function setTool(t){
         tool = t;
         Object.keys(toolButtons).forEach(function(k){ toolButtons[k].classList.toggle("active", k === t); });
+        if(!STAMP_TOOLS[t] && selectedStamp){ selectedStamp = null; renderStampsLayer(); }
       }
       Array.prototype.forEach.call(ov.querySelectorAll(".annot-swatch"), function(btn){
         btn.addEventListener("click", function(){
@@ -764,13 +776,49 @@ button{font-family:var(--font-body);}
       stampBTBtn.addEventListener("click", function(){ setTool(tool === "stampBT" ? "pen" : "stampBT"); });
       goulotteBtn.addEventListener("click", function(){ setTool(tool === "goulotte" ? "pen" : "goulotte"); });
 
+      var stamps = [];
+      var selectedStamp = null;
+      function stampBounds(s){
+        var base = STAMP_BASE_SIZES[s.type];
+        var w0 = base.w * s.scale, h0 = base.h * s.scale;
+        return {left: s.x - w0/2, right: s.x + w0/2, top: s.y - h0/2, bottom: s.y + h0/2};
+      }
+      function hitTestStamp(pt){
+        for(var i = stamps.length - 1; i >= 0; i--){
+          var b = stampBounds(stamps[i]);
+          if(pt.x >= b.left && pt.x <= b.right && pt.y >= b.top && pt.y <= b.bottom) return stamps[i];
+        }
+        return null;
+      }
+      function renderStampsLayer(){
+        stampsCtx.clearRect(0, 0, w, h);
+        stamps.forEach(function(s){
+          STAMP_DRAWERS[s.type](stampsCtx, s.x, s.y, s.color, s.scale);
+          if(s === selectedStamp){
+            var b = stampBounds(s);
+            stampsCtx.save();
+            stampsCtx.strokeStyle = "#1E88E5"; stampsCtx.setLineDash([6,4]); stampsCtx.lineWidth = 2;
+            stampsCtx.strokeRect(b.left - 6, b.top - 6, (b.right-b.left) + 12, (b.bottom-b.top) + 12);
+            stampsCtx.restore();
+          }
+        });
+      }
+
       var drawing = false, last = null, goulottePoints = [];
+      var activePointers = {};
+      var pinchStartDist = null, pinchStartScale = 1;
       function toCanvasPoint(e){
         var r = previewCanvas.getBoundingClientRect();
         return {
           x: (e.clientX - r.left) * (previewCanvas.width / r.width),
           y: (e.clientY - r.top) * (previewCanvas.height / r.height)
         };
+      }
+      function pointerDist(){
+        var ids = Object.keys(activePointers);
+        if(ids.length < 2) return null;
+        var a = activePointers[ids[0]], b = activePointers[ids[1]];
+        return Math.sqrt((a.x-b.x)*(a.x-b.x) + (a.y-b.y)*(a.y-b.y));
       }
       var GOULOTTE_EPSILON = 18;
       function renderGoulottePreview(){
@@ -783,20 +831,54 @@ button{font-family:var(--font-body);}
         previewCtx.lineCap = "round"; previewCtx.lineJoin = "round";
         previewCtx.stroke();
       }
+      var STAMP_TOOLS = {stampUE:"UE", stampUI:"UI", stampPAC:"PAC", stampBT:"BT"};
       previewCanvas.addEventListener("pointerdown", function(e){
         var pt = toCanvasPoint(e);
-        if(tool === "stampUE"){ drawUEStamp(drawCtx, pt.x, pt.y, color); return; }
-        if(tool === "stampUI"){ drawUIStamp(drawCtx, pt.x, pt.y, color); return; }
-        if(tool === "stampPAC"){ drawPACModuleStamp(drawCtx, pt.x, pt.y, color); return; }
-        if(tool === "stampBT"){ drawBTStamp(drawCtx, pt.x, pt.y, color); return; }
+        activePointers[e.pointerId] = pt;
+        previewCanvas.setPointerCapture(e.pointerId);
+
+        if(Object.keys(activePointers).length >= 2 && selectedStamp){
+          drawing = false;
+          pinchStartDist = pointerDist();
+          pinchStartScale = selectedStamp.scale;
+          return;
+        }
+
+        if(STAMP_TOOLS[tool]){
+          var hit = hitTestStamp(pt);
+          if(hit){
+            selectedStamp = hit;
+            renderStampsLayer();
+            return;
+          }
+          selectedStamp = {type: STAMP_TOOLS[tool], x: pt.x, y: pt.y, scale: 1, color: color};
+          stamps.push(selectedStamp);
+          renderStampsLayer();
+          return;
+        }
+
+        if(selectedStamp){ selectedStamp = null; renderStampsLayer(); }
         drawing = true;
         last = pt;
         if(tool === "goulotte") goulottePoints = [pt];
-        previewCanvas.setPointerCapture(e.pointerId);
       });
       previewCanvas.addEventListener("pointermove", function(e){
-        if(!drawing) return;
+        if(!(e.pointerId in activePointers)) return;
         var pt = toCanvasPoint(e);
+        activePointers[e.pointerId] = pt;
+
+        if(pinchStartDist !== null && selectedStamp){
+          var dist = pointerDist();
+          if(dist){
+            var newScale = pinchStartScale * (dist / pinchStartDist);
+            newScale = Math.max(0.4, Math.min(3, newScale));
+            selectedStamp.scale = newScale;
+            renderStampsLayer();
+          }
+          return;
+        }
+
+        if(!drawing) return;
         if(tool === "goulotte"){
           goulottePoints.push(pt);
           renderGoulottePreview();
@@ -814,7 +896,9 @@ button{font-family:var(--font-body);}
         drawCtx.stroke();
         last = pt;
       });
-      function endStroke(){
+      function endStroke(e){
+        delete activePointers[e.pointerId];
+        if(Object.keys(activePointers).length < 2) pinchStartDist = null;
         if(tool === "goulotte" && goulottePoints.length > 1){
           previewCtx.clearRect(0, 0, w, h);
           drawGoulotte(drawCtx, simplifyPath(goulottePoints, GOULOTTE_EPSILON));
@@ -823,22 +907,34 @@ button{font-family:var(--font-body);}
         drawing = false;
       }
       previewCanvas.addEventListener("pointerup", endStroke);
-      previewCanvas.addEventListener("pointercancel", function(){ previewCtx.clearRect(0, 0, w, h); goulottePoints = []; drawing = false; });
+      previewCanvas.addEventListener("pointercancel", function(e){
+        delete activePointers[e.pointerId];
+        if(Object.keys(activePointers).length < 2) pinchStartDist = null;
+        previewCtx.clearRect(0, 0, w, h);
+        goulottePoints = [];
+        drawing = false;
+      });
 
       ov.querySelector("#annotClear").addEventListener("click", function(){
         drawCtx.clearRect(0, 0, w, h);
         previewCtx.clearRect(0, 0, w, h);
+        stamps = [];
+        selectedStamp = null;
+        renderStampsLayer();
       });
       ov.querySelector("#annotCancel").addEventListener("click", function(){
         document.body.removeChild(ov);
         resolve({cancelled: true});
       });
       ov.querySelector("#annotOk").addEventListener("click", function(){
+        selectedStamp = null;
+        renderStampsLayer();
         var out = document.createElement("canvas");
         out.width = w; out.height = h;
         var outCtx = out.getContext("2d");
         outCtx.drawImage(baseCanvas, 0, 0);
         outCtx.drawImage(drawCanvas, 0, 0);
+        outCtx.drawImage(stampsCanvas, 0, 0);
         out.toBlob(function(blob){
           document.body.removeChild(ov);
           resolve({blob: blob});

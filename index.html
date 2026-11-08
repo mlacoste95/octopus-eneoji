@@ -600,7 +600,7 @@ button{font-family:var(--font-body);}
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
   }
-  var STAMP_BASE_SIZES = {UE:{w:100,h:64}, UI:{w:124,h:38}, PAC:{w:140,h:78}, BT:{w:54,h:110}};
+  var STAMP_BASE_SIZES = {UE:{w:100,h:64}, UI:{w:124,h:38}, PAC:{w:90,h:140}, BT:{w:54,h:110}};
   function drawUEStamp(ctx, x, y, color, scale){
     scale = scale || 1;
     var w2 = 100*scale, h2 = 64*scale;
@@ -628,7 +628,7 @@ button{font-family:var(--font-body);}
   }
   function drawPACModuleStamp(ctx, x, y, color, scale){
     scale = scale || 1;
-    var w2 = 140*scale, h2 = 78*scale;
+    var w2 = 90*scale, h2 = 140*scale;
     ctx.save();
     ctx.translate(x - w2/2, y - h2/2);
     ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = color; ctx.lineWidth = 2.5*scale;

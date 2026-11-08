@@ -647,6 +647,33 @@ button{font-family:var(--font-body);}
     ctx.fillText("BT", r, h2/2 + 8);
     ctx.restore();
   }
+  function simplifyPath(points, epsilon){
+    if(points.length < 3) return points.slice();
+    function perpDist(p, a, b){
+      var dx = b.x - a.x, dy = b.y - a.y;
+      var len = Math.sqrt(dx*dx + dy*dy);
+      if(len < 0.0001) return Math.sqrt((p.x-a.x)*(p.x-a.x) + (p.y-a.y)*(p.y-a.y));
+      var t = ((p.x-a.x)*dx + (p.y-a.y)*dy) / (len*len);
+      var projX = a.x + t*dx, projY = a.y + t*dy;
+      return Math.sqrt((p.x-projX)*(p.x-projX) + (p.y-projY)*(p.y-projY));
+    }
+    function rdp(pts){
+      if(pts.length < 3) return pts;
+      var a = pts[0], b = pts[pts.length-1];
+      var maxDist = 0, idx = 0;
+      for(var i=1;i<pts.length-1;i++){
+        var d = perpDist(pts[i], a, b);
+        if(d > maxDist){ maxDist = d; idx = i; }
+      }
+      if(maxDist > epsilon){
+        var left = rdp(pts.slice(0, idx+1));
+        var right = rdp(pts.slice(idx));
+        return left.slice(0, -1).concat(right);
+      }
+      return [a, b];
+    }
+    return rdp(points);
+  }
   function drawGoulotte(ctx, pts){
     if(pts.length < 2) return;
     ctx.save();
@@ -745,13 +772,13 @@ button{font-family:var(--font-body);}
           y: (e.clientY - r.top) * (previewCanvas.height / r.height)
         };
       }
+      var GOULOTTE_EPSILON = 18;
       function renderGoulottePreview(){
         previewCtx.clearRect(0, 0, w, h);
         if(goulottePoints.length < 1) return;
-        var start = goulottePoints[0], end = goulottePoints[goulottePoints.length - 1];
+        var pts = simplifyPath(goulottePoints, GOULOTTE_EPSILON);
         previewCtx.beginPath();
-        previewCtx.moveTo(start.x, start.y);
-        previewCtx.lineTo(end.x, end.y);
+        pts.forEach(function(p, i){ if(i===0) previewCtx.moveTo(p.x, p.y); else previewCtx.lineTo(p.x, p.y); });
         previewCtx.strokeStyle = "#B7B7B7"; previewCtx.lineWidth = 10;
         previewCtx.lineCap = "round"; previewCtx.lineJoin = "round";
         previewCtx.stroke();
@@ -790,8 +817,7 @@ button{font-family:var(--font-body);}
       function endStroke(){
         if(tool === "goulotte" && goulottePoints.length > 1){
           previewCtx.clearRect(0, 0, w, h);
-          var start = goulottePoints[0], end = goulottePoints[goulottePoints.length - 1];
-          drawGoulotte(drawCtx, [start, end]);
+          drawGoulotte(drawCtx, simplifyPath(goulottePoints, GOULOTTE_EPSILON));
         }
         goulottePoints = [];
         drawing = false;

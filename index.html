@@ -621,6 +621,32 @@ button{font-family:var(--font-body);}
     ctx.fillText("UI", w2/2, h2/2 + 1);
     ctx.restore();
   }
+  function drawPACModuleStamp(ctx, x, y, color){
+    var w2 = 104, h2 = 58;
+    ctx.save();
+    ctx.translate(x - w2/2, y - h2/2);
+    ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = color; ctx.lineWidth = 2.5;
+    annotRoundRect(ctx, 0, 0, w2, h2, 9); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = color; ctx.font = "bold 15px Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("PAC", w2/2, h2/2);
+    ctx.restore();
+  }
+  function drawBTStamp(ctx, x, y, color){
+    var w2 = 40, h2 = 82, r = w2/2;
+    ctx.save();
+    ctx.translate(x - w2/2, y - h2/2);
+    ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = color; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(r, r, r, Math.PI, 0);
+    ctx.lineTo(w2, h2 - r);
+    ctx.arc(r, h2 - r, r, 0, Math.PI);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(4, r + 10); ctx.lineTo(w2 - 4, r + 10); ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = color; ctx.font = "bold 12px Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("BT", r, h2/2 + 8);
+    ctx.restore();
+  }
   function drawGoulotte(ctx, pts){
     if(pts.length < 2) return;
     ctx.save();
@@ -684,6 +710,8 @@ button{font-family:var(--font-body);}
             '<button type="button" class="annot-tool-btn" id="annotEraser" title="Gomme">🧽 Gomme</button>' +
             '<button type="button" class="annot-tool-btn" id="annotStampUE" title="Unité extérieure">▭ UE</button>' +
             '<button type="button" class="annot-tool-btn" id="annotStampUI" title="Unité intérieure">▭ UI</button>' +
+            '<button type="button" class="annot-tool-btn" id="annotStampPAC" title="Module intérieur PAC">▭ PAC</button>' +
+            '<button type="button" class="annot-tool-btn" id="annotStampBT" title="Ballon thermodynamique">⬭ BT</button>' +
             '<button type="button" class="annot-tool-btn" id="annotGoulotte" title="Goulotte">╱ Goulotte</button>' +
             '<button type="button" class="annot-clear" id="annotClear">Tout effacer</button>' +
           '</div>' +
@@ -707,8 +735,10 @@ button{font-family:var(--font-body);}
       var eraserBtn = ov.querySelector("#annotEraser");
       var stampUEBtn = ov.querySelector("#annotStampUE");
       var stampUIBtn = ov.querySelector("#annotStampUI");
+      var stampPACBtn = ov.querySelector("#annotStampPAC");
+      var stampBTBtn = ov.querySelector("#annotStampBT");
       var goulotteBtn = ov.querySelector("#annotGoulotte");
-      var toolButtons = {eraser: eraserBtn, stampUE: stampUEBtn, stampUI: stampUIBtn, goulotte: goulotteBtn};
+      var toolButtons = {eraser: eraserBtn, stampUE: stampUEBtn, stampUI: stampUIBtn, stampPAC: stampPACBtn, stampBT: stampBTBtn, goulotte: goulotteBtn};
       function setTool(t){
         tool = t;
         Object.keys(toolButtons).forEach(function(k){ toolButtons[k].classList.toggle("active", k === t); });
@@ -724,6 +754,8 @@ button{font-family:var(--font-body);}
       eraserBtn.addEventListener("click", function(){ setTool(tool === "eraser" ? "pen" : "eraser"); });
       stampUEBtn.addEventListener("click", function(){ setTool(tool === "stampUE" ? "pen" : "stampUE"); });
       stampUIBtn.addEventListener("click", function(){ setTool(tool === "stampUI" ? "pen" : "stampUI"); });
+      stampPACBtn.addEventListener("click", function(){ setTool(tool === "stampPAC" ? "pen" : "stampPAC"); });
+      stampBTBtn.addEventListener("click", function(){ setTool(tool === "stampBT" ? "pen" : "stampBT"); });
       goulotteBtn.addEventListener("click", function(){ setTool(tool === "goulotte" ? "pen" : "goulotte"); });
 
       var drawing = false, last = null, goulottePoints = [];
@@ -746,6 +778,8 @@ button{font-family:var(--font-body);}
         var pt = toCanvasPoint(e);
         if(tool === "stampUE"){ drawUEStamp(drawCtx, pt.x, pt.y, color); return; }
         if(tool === "stampUI"){ drawUIStamp(drawCtx, pt.x, pt.y, color); return; }
+        if(tool === "stampPAC"){ drawPACModuleStamp(drawCtx, pt.x, pt.y, color); return; }
+        if(tool === "stampBT"){ drawBTStamp(drawCtx, pt.x, pt.y, color); return; }
         drawing = true;
         last = pt;
         if(tool === "goulotte") goulottePoints = [pt];

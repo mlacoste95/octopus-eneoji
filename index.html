@@ -915,22 +915,15 @@ button{font-family:var(--font-body);}
         delete activePointers[e.pointerId];
         if(Object.keys(activePointers).length < 2) pinchStartDist = null;
         movingStamp = false;
-        if(tool === "goulotte" && goulottePoints.length > 1){
+        if(tool === "goulotte"){
           previewCtx.clearRect(0, 0, w, h);
-          drawGoulotte(drawCtx, simplifyPath(goulottePoints, GOULOTTE_EPSILON));
+          if(goulottePoints.length > 1) drawGoulotte(drawCtx, simplifyPath(goulottePoints, GOULOTTE_EPSILON));
         }
         goulottePoints = [];
         drawing = false;
       }
       previewCanvas.addEventListener("pointerup", endStroke);
-      previewCanvas.addEventListener("pointercancel", function(e){
-        delete activePointers[e.pointerId];
-        if(Object.keys(activePointers).length < 2) pinchStartDist = null;
-        movingStamp = false;
-        previewCtx.clearRect(0, 0, w, h);
-        goulottePoints = [];
-        drawing = false;
-      });
+      previewCanvas.addEventListener("pointercancel", endStroke);
 
       ov.querySelector("#annotClear").addEventListener("click", function(){
         drawCtx.clearRect(0, 0, w, h);

@@ -192,16 +192,23 @@ button{font-family:var(--font-body);}
   display:flex; flex-direction:column; gap:12px;
   max-width:100%; max-height:100%;
 }
-#annotCanvas{
-  max-width:100%; max-height:62vh; width:auto; height:auto;
-  border-radius:10px; touch-action:none; display:block; background:#111; cursor:crosshair;
-}
+.annot-stage{position:relative; margin:0 auto; max-width:100%; max-height:62vh;}
+.annot-stage canvas{position:absolute; top:0; left:0; width:100%; height:100%; display:block; border-radius:10px;}
+#annotBase{background:#111;}
+#annotDraw{pointer-events:none;}
+#annotPreview{pointer-events:auto; touch-action:none; cursor:crosshair;}
 .annot-tools{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
 .annot-swatch{
   width:28px; height:28px; border-radius:50%; border:2px solid var(--border);
   cursor:pointer; padding:0;
 }
 .annot-swatch.active{border-color:var(--ink); box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--ink);}
+.annot-tool-btn{
+  font-size:0.76rem; font-weight:700; color:var(--ink-soft);
+  background:none; border:1.5px solid var(--border); border-radius:8px; padding:5px 9px; cursor:pointer;
+  line-height:1; white-space:nowrap;
+}
+.annot-tool-btn.active{border-color:var(--ink); color:var(--ink); background:var(--surface-2);}
 .annot-clear{
   margin-left:auto; font-size:0.8rem; font-weight:700; color:var(--ink-soft);
   background:none; border:1px solid var(--border); border-radius:8px; padding:6px 10px; cursor:pointer;
@@ -583,6 +590,220 @@ button{font-family:var(--font-body);}
 
   var ANNOT_COLORS = ["#E53935","#FB8C00","#FDD835","#43A047","#1E88E5","#1A1A1A","#FFFFFF"];
 
+  function annotRoundRect(ctx, x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  function drawUEStamp(ctx, x, y, color){
+    var w2 = 76, h2 = 48;
+    ctx.save();
+    ctx.translate(x - w2/2, y - h2/2);
+    ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = color; ctx.lineWidth = 2.5;
+    annotRoundRect(ctx, 0, 0, w2, h2, 8); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(21, 24, 14, 0, Math.PI*2); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(10, 24); ctx.lineTo(32, 24); ctx.moveTo(21, 13); ctx.lineTo(21, 35); ctx.stroke();
+    ctx.fillStyle = color; ctx.font = "bold 15px Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("UE", 54, 24);
+    ctx.restore();
+  }
+  function drawUIStamp(ctx, x, y, color){
+    var w2 = 94, h2 = 28;
+    ctx.save();
+    ctx.translate(x - w2/2, y - h2/2);
+    ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = color; ctx.lineWidth = 2.5;
+    annotRoundRect(ctx, 0, 0, w2, h2, 13); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = color; ctx.font = "bold 14px Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("UI", w2/2, h2/2 + 1);
+    ctx.restore();
+  }
+  function drawGoulotte(ctx, pts){
+    if(pts.length < 2) return;
+    ctx.save();
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath(); pts.forEach(function(p,i){ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
+    ctx.strokeStyle = "#9A9A9A"; ctx.lineWidth = 11; ctx.stroke();
+    ctx.beginPath(); pts.forEach(function(p,i){ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
+    ctx.strokeStyle = "#F2F2F2"; ctx.lineWidth = 7; ctx.stroke();
+    var tickSpacing = 16, distSinceTick = 0;
+    for(var i=1;i<pts.length;i++){
+      var a = pts[i-1], b = pts[i];
+      var dx = b.x - a.x, dy = b.y - a.y;
+      var segLen = Math.sqrt(dx*dx + dy*dy);
+      if(segLen < 0.001) continue;
+      var ux = dx/segLen, uy = dy/segLen;
+      var nx = -uy, ny = ux;
+      var pos = 0;
+      while(distSinceTick + (segLen - pos) >= tickSpacing){
+        pos += (tickSpacing - distSinceTick);
+        distSinceTick = 0;
+        var tx = a.x + ux*pos, ty = a.y + uy*pos;
+        ctx.beginPath();
+        ctx.moveTo(tx - nx*5, ty - ny*5);
+        ctx.lineTo(tx + nx*5, ty + ny*5);
+        ctx.strokeStyle = "#9A9A9A"; ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      distSinceTick += (segLen - pos);
+    }
+    ctx.restore();
+  }
+
+  function openAnnotator(img, opts){
+    opts = opts || {};
+    return new Promise(function(resolve){
+      var maxW = 1000, maxH = 1000;
+      var scale = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight);
+      var w = Math.max(1, Math.round(img.naturalWidth * scale));
+      var h = Math.max(1, Math.round(img.naturalHeight * scale));
+
+      var maxDispW = Math.max(100, (window.innerWidth || 360) - 64);
+      var maxDispH = Math.max(100, (window.innerHeight || 640) * 0.62);
+      var dispScale = Math.min(1, maxDispW / w, maxDispH / h);
+      var dispW = Math.round(w * dispScale);
+      var dispH = Math.round(h * dispScale);
+
+      var ov = document.createElement("div");
+      ov.className = "annot-overlay";
+      ov.innerHTML =
+        '<div class="annot-panel">' +
+          (opts.indexLabel ? '<div class="annot-counter">' + esc(opts.indexLabel) + '</div>' : '') +
+          '<div class="annot-stage" style="width:' + dispW + 'px; height:' + dispH + 'px;">' +
+            '<canvas id="annotBase" width="' + w + '" height="' + h + '"></canvas>' +
+            '<canvas id="annotDraw" width="' + w + '" height="' + h + '"></canvas>' +
+            '<canvas id="annotPreview" width="' + w + '" height="' + h + '"></canvas>' +
+          '</div>' +
+          '<div class="annot-tools">' +
+            ANNOT_COLORS.map(function(c, i){
+              return '<button type="button" class="annot-swatch' + (i===0?' active':'') + '" data-color="' + c + '" style="background:' + c + '" aria-label="Couleur"></button>';
+            }).join("") +
+            '<button type="button" class="annot-tool-btn" id="annotEraser" title="Gomme">🧽 Gomme</button>' +
+            '<button type="button" class="annot-tool-btn" id="annotStampUE" title="Unité extérieure">▭ UE</button>' +
+            '<button type="button" class="annot-tool-btn" id="annotStampUI" title="Unité intérieure">▭ UI</button>' +
+            '<button type="button" class="annot-tool-btn" id="annotGoulotte" title="Goulotte">╱ Goulotte</button>' +
+            '<button type="button" class="annot-clear" id="annotClear">Tout effacer</button>' +
+          '</div>' +
+          '<div class="annot-actions">' +
+            '<button type="button" class="btn btn-ghost" id="annotCancel">' + esc(opts.cancelLabel || "Annuler") + '</button>' +
+            '<button type="button" class="btn btn-primary" id="annotOk">' + esc(opts.validateLabel || "Valider") + '</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(ov);
+
+      var baseCanvas = ov.querySelector("#annotBase");
+      var drawCanvas = ov.querySelector("#annotDraw");
+      var previewCanvas = ov.querySelector("#annotPreview");
+      var baseCtx = baseCanvas.getContext("2d");
+      var drawCtx = drawCanvas.getContext("2d");
+      var previewCtx = previewCanvas.getContext("2d");
+      baseCtx.drawImage(img, 0, 0, w, h);
+
+      var color = ANNOT_COLORS[0];
+      var tool = "pen";
+      var eraserBtn = ov.querySelector("#annotEraser");
+      var stampUEBtn = ov.querySelector("#annotStampUE");
+      var stampUIBtn = ov.querySelector("#annotStampUI");
+      var goulotteBtn = ov.querySelector("#annotGoulotte");
+      var toolButtons = {eraser: eraserBtn, stampUE: stampUEBtn, stampUI: stampUIBtn, goulotte: goulotteBtn};
+      function setTool(t){
+        tool = t;
+        Object.keys(toolButtons).forEach(function(k){ toolButtons[k].classList.toggle("active", k === t); });
+      }
+      Array.prototype.forEach.call(ov.querySelectorAll(".annot-swatch"), function(btn){
+        btn.addEventListener("click", function(){
+          color = btn.dataset.color;
+          if(tool === "eraser") setTool("pen");
+          Array.prototype.forEach.call(ov.querySelectorAll(".annot-swatch"), function(b){ b.classList.remove("active"); });
+          btn.classList.add("active");
+        });
+      });
+      eraserBtn.addEventListener("click", function(){ setTool(tool === "eraser" ? "pen" : "eraser"); });
+      stampUEBtn.addEventListener("click", function(){ setTool(tool === "stampUE" ? "pen" : "stampUE"); });
+      stampUIBtn.addEventListener("click", function(){ setTool(tool === "stampUI" ? "pen" : "stampUI"); });
+      goulotteBtn.addEventListener("click", function(){ setTool(tool === "goulotte" ? "pen" : "goulotte"); });
+
+      var drawing = false, last = null, goulottePoints = [];
+      function toCanvasPoint(e){
+        var r = previewCanvas.getBoundingClientRect();
+        return {
+          x: (e.clientX - r.left) * (previewCanvas.width / r.width),
+          y: (e.clientY - r.top) * (previewCanvas.height / r.height)
+        };
+      }
+      function renderGoulottePreview(){
+        previewCtx.clearRect(0, 0, w, h);
+        previewCtx.beginPath();
+        goulottePoints.forEach(function(p, i){ if(i===0) previewCtx.moveTo(p.x, p.y); else previewCtx.lineTo(p.x, p.y); });
+        previewCtx.strokeStyle = "#B7B7B7"; previewCtx.lineWidth = 10;
+        previewCtx.lineCap = "round"; previewCtx.lineJoin = "round";
+        previewCtx.stroke();
+      }
+      previewCanvas.addEventListener("pointerdown", function(e){
+        var pt = toCanvasPoint(e);
+        if(tool === "stampUE"){ drawUEStamp(drawCtx, pt.x, pt.y, color); return; }
+        if(tool === "stampUI"){ drawUIStamp(drawCtx, pt.x, pt.y, color); return; }
+        drawing = true;
+        last = pt;
+        if(tool === "goulotte") goulottePoints = [pt];
+        previewCanvas.setPointerCapture(e.pointerId);
+      });
+      previewCanvas.addEventListener("pointermove", function(e){
+        if(!drawing) return;
+        var pt = toCanvasPoint(e);
+        if(tool === "goulotte"){
+          goulottePoints.push(pt);
+          renderGoulottePreview();
+          last = pt;
+          return;
+        }
+        drawCtx.globalCompositeOperation = tool === "eraser" ? "destination-out" : "source-over";
+        drawCtx.strokeStyle = color;
+        drawCtx.lineWidth = tool === "eraser" ? 24 : 5;
+        drawCtx.lineCap = "round";
+        drawCtx.lineJoin = "round";
+        drawCtx.beginPath();
+        drawCtx.moveTo(last.x, last.y);
+        drawCtx.lineTo(pt.x, pt.y);
+        drawCtx.stroke();
+        last = pt;
+      });
+      function endStroke(){
+        if(tool === "goulotte" && goulottePoints.length > 1){
+          previewCtx.clearRect(0, 0, w, h);
+          drawGoulotte(drawCtx, goulottePoints);
+        }
+        goulottePoints = [];
+        drawing = false;
+      }
+      previewCanvas.addEventListener("pointerup", endStroke);
+      previewCanvas.addEventListener("pointercancel", function(){ previewCtx.clearRect(0, 0, w, h); goulottePoints = []; drawing = false; });
+
+      ov.querySelector("#annotClear").addEventListener("click", function(){
+        drawCtx.clearRect(0, 0, w, h);
+        previewCtx.clearRect(0, 0, w, h);
+      });
+      ov.querySelector("#annotCancel").addEventListener("click", function(){
+        document.body.removeChild(ov);
+        resolve({cancelled: true});
+      });
+      ov.querySelector("#annotOk").addEventListener("click", function(){
+        var out = document.createElement("canvas");
+        out.width = w; out.height = h;
+        var outCtx = out.getContext("2d");
+        outCtx.drawImage(baseCanvas, 0, 0);
+        outCtx.drawImage(drawCanvas, 0, 0);
+        out.toBlob(function(blob){
+          document.body.removeChild(ov);
+          resolve({blob: blob});
+        }, "image/jpeg", 0.85);
+      });
+    });
+  }
+
   function annotatePhoto(file, indexLabel){
     return new Promise(function(resolve){
       var url = URL.createObjectURL(file);
@@ -593,87 +814,9 @@ button{font-family:var(--font-body);}
       }, 8000);
       img.onload = function(){
         clearTimeout(loadTimeout);
-        var maxW = 1000, maxH = 1000;
-        var scale = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight);
-        var w = Math.max(1, Math.round(img.naturalWidth * scale));
-        var h = Math.max(1, Math.round(img.naturalHeight * scale));
-
-        var ov = document.createElement("div");
-        ov.className = "annot-overlay";
-        ov.innerHTML =
-          '<div class="annot-panel">' +
-            (indexLabel ? '<div class="annot-counter">' + esc(indexLabel) + '</div>' : '') +
-            '<canvas id="annotCanvas" width="' + w + '" height="' + h + '"></canvas>' +
-            '<div class="annot-tools">' +
-              ANNOT_COLORS.map(function(c, i){
-                return '<button type="button" class="annot-swatch' + (i===0?' active':'') + '" data-color="' + c + '" style="background:' + c + '" aria-label="Couleur"></button>';
-              }).join("") +
-              '<button type="button" class="annot-clear" id="annotClear">Tout effacer</button>' +
-            '</div>' +
-            '<div class="annot-actions">' +
-              '<button type="button" class="btn btn-ghost" id="annotCancel">Annuler la photo</button>' +
-              '<button type="button" class="btn btn-primary" id="annotOk">Valider</button>' +
-            '</div>' +
-          '</div>';
-        document.body.appendChild(ov);
-
-        var canvas = ov.querySelector("#annotCanvas");
-        var ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, w, h);
-
-        var color = ANNOT_COLORS[0];
-        Array.prototype.forEach.call(ov.querySelectorAll(".annot-swatch"), function(btn){
-          btn.addEventListener("click", function(){
-            color = btn.dataset.color;
-            Array.prototype.forEach.call(ov.querySelectorAll(".annot-swatch"), function(b){ b.classList.remove("active"); });
-            btn.classList.add("active");
-          });
-        });
-
-        var drawing = false, last = null;
-        function toCanvasPoint(e){
-          var r = canvas.getBoundingClientRect();
-          return {
-            x: (e.clientX - r.left) * (canvas.width / r.width),
-            y: (e.clientY - r.top) * (canvas.height / r.height)
-          };
-        }
-        canvas.addEventListener("pointerdown", function(e){
-          drawing = true;
-          last = toCanvasPoint(e);
-          canvas.setPointerCapture(e.pointerId);
-        });
-        canvas.addEventListener("pointermove", function(e){
-          if(!drawing) return;
-          var pt = toCanvasPoint(e);
-          ctx.strokeStyle = color;
-          ctx.lineWidth = 5;
-          ctx.lineCap = "round";
-          ctx.lineJoin = "round";
-          ctx.beginPath();
-          ctx.moveTo(last.x, last.y);
-          ctx.lineTo(pt.x, pt.y);
-          ctx.stroke();
-          last = pt;
-        });
-        canvas.addEventListener("pointerup", function(){ drawing = false; });
-        canvas.addEventListener("pointercancel", function(){ drawing = false; });
-
-        ov.querySelector("#annotClear").addEventListener("click", function(){
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0, w, h);
-        });
-        ov.querySelector("#annotCancel").addEventListener("click", function(){
+        openAnnotator(img, {indexLabel: indexLabel, cancelLabel: "Annuler la photo", validateLabel: "Valider"}).then(function(res){
           URL.revokeObjectURL(url);
-          document.body.removeChild(ov);
-          resolve(null);
-        });
-        ov.querySelector("#annotOk").addEventListener("click", function(){
-          canvas.toBlob(function(blob){
-            URL.revokeObjectURL(url);
-            document.body.removeChild(ov);
-            resolve(blob || file);
-          }, "image/jpeg", 0.85);
+          resolve(res.cancelled ? null : (res.blob || file));
         });
       };
       img.onerror = function(){ clearTimeout(loadTimeout); URL.revokeObjectURL(url); resolve(file); };
@@ -681,18 +824,23 @@ button{font-family:var(--font-body);}
     });
   }
 
-  function viewPhoto(url){
+  function viewPhoto(url, onEdit){
     var ov = document.createElement("div");
     ov.className = "annot-overlay";
     ov.innerHTML =
       '<div class="annot-panel">' +
         '<img src="' + esc(url) + '" style="max-width:100%; max-height:76vh; width:auto; height:auto; border-radius:10px; display:block;">' +
-        '<div class="annot-actions"><div></div><button type="button" class="btn btn-primary" id="viewClose">Fermer</button></div>' +
+        '<div class="annot-actions">' +
+          (onEdit ? '<button type="button" class="btn btn-ghost" id="viewEdit">✏️ Modifier</button>' : '<div></div>') +
+          '<button type="button" class="btn btn-primary" id="viewClose">Fermer</button>' +
+        '</div>' +
       '</div>';
     document.body.appendChild(ov);
     function finish(){ document.body.removeChild(ov); }
     ov.addEventListener("click", function(e){ if(e.target === ov) finish(); });
     ov.querySelector("#viewClose").addEventListener("click", finish);
+    var editBtn = ov.querySelector("#viewEdit");
+    if(editBtn) editBtn.addEventListener("click", function(){ finish(); onEdit(); });
   }
 
   function formatPhoneDisplay(phone){
@@ -1136,10 +1284,44 @@ button{font-family:var(--font-body);}
     var photoGrid = document.getElementById("photoGrid");
     var photoInputCamera = document.getElementById("fPhotoInputCamera");
     var photoInputGallery = document.getElementById("fPhotoInputGallery");
+    function editSavedPhoto(photoObj, isPending){
+      var src = isPending ? URL.createObjectURL(photoObj.blob) : photoObj.url;
+      var img = new Image();
+      if(!isPending) img.crossOrigin = "anonymous";
+      img.onload = function(){
+        openAnnotator(img, {cancelLabel: "Fermer sans modifier", validateLabel: "Enregistrer la modification"}).then(function(res){
+          if(isPending) URL.revokeObjectURL(src);
+          if(res.cancelled || !res.blob) return;
+          var blob = res.blob;
+          if(isPending){
+            addPendingPhoto({localId: photoObj.id, leadId: l.id, blob: blob, path: photoObj.path}).then(renderPhotoGrid);
+            return;
+          }
+          if(!navigator.onLine || !storage || !db || !canWrite){
+            showBanner("Pas de connexion : impossible d'enregistrer la modification pour le moment. Réessaie plus tard.");
+            return;
+          }
+          uploadWithTimeout(blob, photoObj.path, 15000).then(function(uploadRes){
+            if(!uploadRes.ok){
+              showBanner("Échec de l'enregistrement de la modification. Réessaie.");
+              return;
+            }
+            var idx = (l.photos || []).findIndex(function(p){ return p.id === photoObj.id; });
+            if(idx !== -1){
+              l.photos[idx] = Object.assign({}, l.photos[idx], {url: uploadRes.url});
+              if(db && canWrite) db.collection("leads").doc(l.id).update({photos: l.photos});
+            }
+            renderPhotoGrid();
+          });
+        });
+      };
+      img.onerror = function(){ if(isPending) URL.revokeObjectURL(src); showBanner("Impossible de charger la photo pour modification."); };
+      img.src = src;
+    }
     function renderPhotoGrid(){
       var photos = Array.isArray(l.photos) ? l.photos : [];
       getPendingPhotosForLead(l.id).then(function(pending){
-        var pendingPhotos = pending.map(function(p){ return {id: p.localId, url: URL.createObjectURL(p.blob), pending: true}; });
+        var pendingPhotos = pending.map(function(p){ return {id: p.localId, url: URL.createObjectURL(p.blob), pending: true, blob: p.blob, path: p.path}; });
         var all = photos.concat(pendingPhotos);
         photoGrid.innerHTML = all.map(function(p){
           return '<div class="photo-thumb" data-id="' + esc(p.id) + '">' +
@@ -1154,8 +1336,12 @@ button{font-family:var(--font-body);}
         if(camBtn) camBtn.addEventListener("click", function(){ photoInputCamera.click(); });
         if(galBtn) galBtn.addEventListener("click", function(){ photoInputGallery.click(); });
         Array.prototype.forEach.call(photoGrid.querySelectorAll(".photo-thumb"), function(thumb){
-          var url = (all.find(function(p){ return p.id === thumb.dataset.id; }) || {}).url;
-          thumb.querySelector("img").addEventListener("click", function(){ if(url) viewPhoto(url); });
+          var p = all.find(function(x){ return x.id === thumb.dataset.id; });
+          var url = p && p.url;
+          thumb.querySelector("img").addEventListener("click", function(){
+            if(!url) return;
+            viewPhoto(url, function(){ editSavedPhoto(p, !!p.pending); });
+          });
         });
         Array.prototype.forEach.call(photoGrid.querySelectorAll(".rm"), function(btn){
           btn.addEventListener("click", function(e){

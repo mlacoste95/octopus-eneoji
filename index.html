@@ -683,14 +683,28 @@ button{font-family:var(--font-body);}
     }
     return rdp(points);
   }
-  function drawGoulotte(ctx, pts){
+  var TRACE_STYLES = {
+    goulotte: {kind: "band", border: "#D2D2D2", fill: "#FFFFFF", borderW: 18, fillW: 14},
+    elec: {kind: "line", color: "#E53935", lineW: 4.5},
+    condensats: {kind: "line", color: "#1E88E5", lineW: 4.5}
+  };
+  function strokePath(ctx, pts){
+    ctx.beginPath();
+    pts.forEach(function(p,i){ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
+    ctx.stroke();
+  }
+  function drawTraceLine(ctx, pts, type, dashed){
     if(pts.length < 2) return;
+    var s = TRACE_STYLES[type];
     ctx.save();
     ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.beginPath(); pts.forEach(function(p,i){ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
-    ctx.strokeStyle = "#D2D2D2"; ctx.lineWidth = 18; ctx.stroke();
-    ctx.beginPath(); pts.forEach(function(p,i){ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
-    ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = 14; ctx.stroke();
+    if(dashed) ctx.setLineDash(s.kind === "band" ? [20, 14] : [11, 9]);
+    if(s.kind === "band"){
+      ctx.strokeStyle = s.border; ctx.lineWidth = s.borderW; strokePath(ctx, pts);
+      ctx.strokeStyle = s.fill; ctx.lineWidth = s.fillW; strokePath(ctx, pts);
+    } else {
+      ctx.strokeStyle = s.color; ctx.lineWidth = s.lineW; strokePath(ctx, pts);
+    }
     ctx.restore();
   }
 
@@ -733,6 +747,9 @@ button{font-family:var(--font-body);}
             '<button type="button" class="annot-tool-btn" id="annotStampBT" title="Ballon thermodynamique">' +
               '<svg class="annot-tool-icon" width="10" height="18" viewBox="0 0 20 36"><rect x="1.5" y="1.5" width="17" height="33" rx="8.5" fill="none" stroke="currentColor" stroke-width="2.4"/></svg> BT</button>' +
             '<button type="button" class="annot-tool-btn" id="annotGoulotte" title="Goulotte">╱ Goulotte</button>' +
+            '<button type="button" class="annot-tool-btn" id="annotElec" title="Tracé électrique"><span style="color:#E53935;">╱</span> Élec</button>' +
+            '<button type="button" class="annot-tool-btn" id="annotCondensats" title="Tracé condensats"><span style="color:#1E88E5;">╱</span> Cond.</button>' +
+            '<button type="button" class="annot-tool-btn" id="annotDashed" title="Pointillé (derrière le mur)">┄ Pointillé</button>' +
             '<button type="button" class="annot-clear" id="annotClear">Tout effacer</button>' +
           '</div>' +
           '<div class="annot-actions">' +
@@ -760,7 +777,11 @@ button{font-family:var(--font-body);}
       var stampPACBtn = ov.querySelector("#annotStampPAC");
       var stampBTBtn = ov.querySelector("#annotStampBT");
       var goulotteBtn = ov.querySelector("#annotGoulotte");
-      var toolButtons = {eraser: eraserBtn, stampUE: stampUEBtn, stampUI: stampUIBtn, stampPAC: stampPACBtn, stampBT: stampBTBtn, goulotte: goulotteBtn};
+      var elecBtn = ov.querySelector("#annotElec");
+      var condensatsBtn = ov.querySelector("#annotCondensats");
+      var dashedBtn = ov.querySelector("#annotDashed");
+      var dashedMode = false;
+      var toolButtons = {eraser: eraserBtn, stampUE: stampUEBtn, stampUI: stampUIBtn, stampPAC: stampPACBtn, stampBT: stampBTBtn, goulotte: goulotteBtn, elec: elecBtn, condensats: condensatsBtn};
       function setTool(t){
         tool = t;
         Object.keys(toolButtons).forEach(function(k){ toolButtons[k].classList.toggle("active", k === t); });
@@ -780,6 +801,9 @@ button{font-family:var(--font-body);}
       stampPACBtn.addEventListener("click", function(){ setTool(tool === "stampPAC" ? "pen" : "stampPAC"); });
       stampBTBtn.addEventListener("click", function(){ setTool(tool === "stampBT" ? "pen" : "stampBT"); });
       goulotteBtn.addEventListener("click", function(){ setTool(tool === "goulotte" ? "pen" : "goulotte"); });
+      elecBtn.addEventListener("click", function(){ setTool(tool === "elec" ? "pen" : "elec"); });
+      condensatsBtn.addEventListener("click", function(){ setTool(tool === "condensats" ? "pen" : "condensats"); });
+      dashedBtn.addEventListener("click", function(){ dashedMode = !dashedMode; dashedBtn.classList.toggle("active", dashedMode); });
 
       var stamps = [];
       var selectedStamp = null;
@@ -809,7 +833,7 @@ button{font-family:var(--font-body);}
         });
       }
 
-      var drawing = false, last = null, goulottePoints = [];
+      var drawing = false, last = null, tracePoints = [];
       var activePointers = {};
       var pinchStartDist = null, pinchStartScale = 1;
       function toCanvasPoint(e){
@@ -825,16 +849,21 @@ button{font-family:var(--font-body);}
         var a = activePointers[ids[0]], b = activePointers[ids[1]];
         return Math.sqrt((a.x-b.x)*(a.x-b.x) + (a.y-b.y)*(a.y-b.y));
       }
-      var GOULOTTE_EPSILON = 18;
-      function renderGoulottePreview(){
+      var TRACE_EPSILON = 18;
+      var TRACE_TOOLS = {goulotte:1, elec:1, condensats:1};
+      function renderTracePreview(){
         previewCtx.clearRect(0, 0, w, h);
-        if(goulottePoints.length < 1) return;
-        var pts = simplifyPath(goulottePoints, GOULOTTE_EPSILON);
+        if(tracePoints.length < 1) return;
+        var pts = simplifyPath(tracePoints, TRACE_EPSILON);
+        var previewColor = tool === "elec" ? "#E53935" : tool === "condensats" ? "#1E88E5" : "#B7B7B7";
+        previewCtx.save();
+        if(dashedMode) previewCtx.setLineDash(tool === "goulotte" ? [20,14] : [11,9]);
         previewCtx.beginPath();
         pts.forEach(function(p, i){ if(i===0) previewCtx.moveTo(p.x, p.y); else previewCtx.lineTo(p.x, p.y); });
-        previewCtx.strokeStyle = "#B7B7B7"; previewCtx.lineWidth = 16;
+        previewCtx.strokeStyle = previewColor; previewCtx.lineWidth = tool === "goulotte" ? 16 : 5;
         previewCtx.lineCap = "round"; previewCtx.lineJoin = "round";
         previewCtx.stroke();
+        previewCtx.restore();
       }
       var STAMP_TOOLS = {stampUE:"UE", stampUI:"UI", stampPAC:"PAC", stampBT:"BT"};
       var movingStamp = false, moveStart = null;
@@ -868,7 +897,7 @@ button{font-family:var(--font-body);}
         if(selectedStamp){ selectedStamp = null; renderStampsLayer(); }
         drawing = true;
         last = pt;
-        if(tool === "goulotte") goulottePoints = [pt];
+        if(TRACE_TOOLS[tool]) tracePoints = [pt];
       });
       previewCanvas.addEventListener("pointermove", function(e){
         if(!(e.pointerId in activePointers)) return;
@@ -894,9 +923,9 @@ button{font-family:var(--font-body);}
         }
 
         if(!drawing) return;
-        if(tool === "goulotte"){
-          goulottePoints.push(pt);
-          renderGoulottePreview();
+        if(TRACE_TOOLS[tool]){
+          tracePoints.push(pt);
+          renderTracePreview();
           last = pt;
           return;
         }
@@ -915,11 +944,11 @@ button{font-family:var(--font-body);}
         delete activePointers[e.pointerId];
         if(Object.keys(activePointers).length < 2) pinchStartDist = null;
         movingStamp = false;
-        if(tool === "goulotte"){
+        if(TRACE_TOOLS[tool]){
           previewCtx.clearRect(0, 0, w, h);
-          if(goulottePoints.length > 1) drawGoulotte(drawCtx, simplifyPath(goulottePoints, GOULOTTE_EPSILON));
+          if(tracePoints.length > 1) drawTraceLine(drawCtx, simplifyPath(tracePoints, TRACE_EPSILON), tool, dashedMode);
         }
-        goulottePoints = [];
+        tracePoints = [];
         drawing = false;
       }
       previewCanvas.addEventListener("pointerup", endStroke);

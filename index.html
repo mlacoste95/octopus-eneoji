@@ -698,7 +698,7 @@ button{font-family:var(--font-body);}
     var s = TRACE_STYLES[type];
     ctx.save();
     ctx.lineCap = "round"; ctx.lineJoin = "round";
-    if(dashed) ctx.setLineDash(s.kind === "band" ? [20, 14] : [11, 9]);
+    if(dashed) ctx.setLineDash(s.kind === "band" ? [16, 32] : [11, 9]);
     if(s.kind === "band"){
       ctx.strokeStyle = s.border; ctx.lineWidth = s.borderW; strokePath(ctx, pts);
       ctx.strokeStyle = s.fill; ctx.lineWidth = s.fillW; strokePath(ctx, pts);

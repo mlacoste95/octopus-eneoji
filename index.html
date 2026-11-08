@@ -855,15 +855,7 @@ button{font-family:var(--font-body);}
         previewCtx.clearRect(0, 0, w, h);
         if(tracePoints.length < 1) return;
         var pts = simplifyPath(tracePoints, TRACE_EPSILON);
-        var previewColor = tool === "elec" ? "#E53935" : tool === "condensats" ? "#1E88E5" : "#B7B7B7";
-        previewCtx.save();
-        if(dashedMode) previewCtx.setLineDash(tool === "goulotte" ? [20,14] : [11,9]);
-        previewCtx.beginPath();
-        pts.forEach(function(p, i){ if(i===0) previewCtx.moveTo(p.x, p.y); else previewCtx.lineTo(p.x, p.y); });
-        previewCtx.strokeStyle = previewColor; previewCtx.lineWidth = tool === "goulotte" ? 16 : 5;
-        previewCtx.lineCap = "round"; previewCtx.lineJoin = "round";
-        previewCtx.stroke();
-        previewCtx.restore();
+        drawTraceLine(previewCtx, pts, tool, dashedMode);
       }
       var STAMP_TOOLS = {stampUE:"UE", stampUI:"UI", stampPAC:"PAC", stampBT:"BT"};
       var movingStamp = false, moveStart = null;

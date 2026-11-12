@@ -216,6 +216,15 @@ button{font-family:var(--font-body);}
   background:none; border:1px solid var(--border); border-radius:8px; padding:6px 10px; cursor:pointer;
 }
 .annot-actions{display:flex; justify-content:space-between; gap:10px;}
+.view-stage{position:relative; overflow:hidden; max-width:100%; max-height:76vh; display:flex; align-items:center; justify-content:center; touch-action:none; border-radius:10px; background:#111;}
+.view-stage img{max-width:100%; max-height:76vh; width:auto; height:auto; display:block; touch-action:none;}
+.view-nav{
+  position:absolute; top:50%; transform:translateY(-50%); background:rgba(0,0,0,0.45); color:#fff;
+  border:none; width:38px; height:38px; border-radius:50%; font-size:1.3rem; line-height:1; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.view-nav.prev{left:8px;}
+.view-nav.next{right:8px;}
 .annot-counter{font-size:0.78rem; color:var(--ink-muted); text-align:center;}
 .hidden-list{display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow-y:auto;}
 .hidden-list-row{
@@ -994,23 +1003,117 @@ button{font-family:var(--font-body);}
     });
   }
 
-  function viewPhoto(url, onEdit){
+  function viewPhoto(photos, startIndex, onEdit){
+    var idx = startIndex || 0;
+    var multi = photos.length > 1;
     var ov = document.createElement("div");
     ov.className = "annot-overlay";
     ov.innerHTML =
       '<div class="annot-panel">' +
-        '<img src="' + esc(url) + '" style="max-width:100%; max-height:76vh; width:auto; height:auto; border-radius:10px; display:block;">' +
+        '<div class="view-stage" id="viewStage">' +
+          '<img id="viewImg" src="' + esc(photos[idx].url) + '">' +
+          (multi ? '<button type="button" class="view-nav prev" id="viewPrev" aria-label="Photo précédente">‹</button>' : '') +
+          (multi ? '<button type="button" class="view-nav next" id="viewNext" aria-label="Photo suivante">›</button>' : '') +
+        '</div>' +
         '<div class="annot-actions">' +
           (onEdit ? '<button type="button" class="btn btn-ghost" id="viewEdit">✏️ Modifier</button>' : '<div></div>') +
           '<button type="button" class="btn btn-primary" id="viewClose">Fermer</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(ov);
-    function finish(){ document.body.removeChild(ov); }
+
+    var viewStage = ov.querySelector("#viewStage");
+    var viewImg = ov.querySelector("#viewImg");
+    var prevBtn = ov.querySelector("#viewPrev");
+    var nextBtn = ov.querySelector("#viewNext");
+
+    var scale = 1, panX = 0, panY = 0;
+    var activePointers = {};
+    var pinchStartDist = null, pinchStartScale = 1;
+    var dragging = false, dragStart = null, panStart = null;
+    var lastTapTime = 0;
+
+    function applyTransform(){
+      viewImg.style.transform = "translate(" + panX + "px," + panY + "px) scale(" + scale + ")";
+    }
+    function resetZoom(){ scale = 1; panX = 0; panY = 0; applyTransform(); }
+    function dist(a, b){ return Math.sqrt((a.x-b.x)*(a.x-b.x) + (a.y-b.y)*(a.y-b.y)); }
+
+    function go(delta){
+      idx = (idx + delta + photos.length) % photos.length;
+      resetZoom();
+      viewImg.src = photos[idx].url;
+    }
+    if(prevBtn) prevBtn.addEventListener("click", function(){ go(-1); });
+    if(nextBtn) nextBtn.addEventListener("click", function(){ go(1); });
+
+    viewStage.addEventListener("pointerdown", function(e){
+      activePointers[e.pointerId] = {x: e.clientX, y: e.clientY};
+      viewStage.setPointerCapture(e.pointerId);
+      var ids = Object.keys(activePointers);
+      if(ids.length === 2){
+        var pts = ids.map(function(id){ return activePointers[id]; });
+        pinchStartDist = dist(pts[0], pts[1]);
+        pinchStartScale = scale;
+        dragging = false;
+      } else if(ids.length === 1){
+        var now = Date.now();
+        if(now - lastTapTime < 300){
+          scale = scale > 1 ? 1 : 2.5;
+          panX = 0; panY = 0;
+          applyTransform();
+          lastTapTime = 0;
+        } else {
+          lastTapTime = now;
+        }
+        if(scale > 1){
+          dragging = true;
+          dragStart = {x: e.clientX, y: e.clientY};
+          panStart = {x: panX, y: panY};
+        }
+      }
+    });
+    viewStage.addEventListener("pointermove", function(e){
+      if(!(e.pointerId in activePointers)) return;
+      activePointers[e.pointerId] = {x: e.clientX, y: e.clientY};
+      var ids = Object.keys(activePointers);
+      if(ids.length === 2 && pinchStartDist){
+        var pts = ids.map(function(id){ return activePointers[id]; });
+        var d = dist(pts[0], pts[1]);
+        scale = Math.max(1, Math.min(4, pinchStartScale * (d / pinchStartDist)));
+        applyTransform();
+        return;
+      }
+      if(dragging){
+        panX = panStart.x + (e.clientX - dragStart.x);
+        panY = panStart.y + (e.clientY - dragStart.y);
+        applyTransform();
+      }
+    });
+    function endPointer(e){
+      delete activePointers[e.pointerId];
+      if(Object.keys(activePointers).length < 2) pinchStartDist = null;
+      dragging = false;
+      if(scale <= 1){ scale = 1; panX = 0; panY = 0; applyTransform(); }
+    }
+    viewStage.addEventListener("pointerup", endPointer);
+    viewStage.addEventListener("pointercancel", endPointer);
+
+    function onKey(e){
+      if(e.key === "ArrowLeft") go(-1);
+      else if(e.key === "ArrowRight") go(1);
+      else if(e.key === "Escape") finish();
+    }
+    document.addEventListener("keydown", onKey);
+
+    function finish(){
+      document.removeEventListener("keydown", onKey);
+      document.body.removeChild(ov);
+    }
     ov.addEventListener("click", function(e){ if(e.target === ov) finish(); });
     ov.querySelector("#viewClose").addEventListener("click", finish);
     var editBtn = ov.querySelector("#viewEdit");
-    if(editBtn) editBtn.addEventListener("click", function(){ finish(); onEdit(); });
+    if(editBtn) editBtn.addEventListener("click", function(){ var p = photos[idx]; finish(); onEdit(p); });
   }
 
   function formatPhoneDisplay(phone){
@@ -1510,7 +1613,7 @@ button{font-family:var(--font-body);}
           var url = p && p.url;
           thumb.querySelector("img").addEventListener("click", function(){
             if(!url) return;
-            viewPhoto(url, function(){ editSavedPhoto(p, !!p.pending); });
+            viewPhoto(all, all.indexOf(p), function(photoObj){ editSavedPhoto(photoObj, !!photoObj.pending); });
           });
         });
         Array.prototype.forEach.call(photoGrid.querySelectorAll(".rm"), function(btn){

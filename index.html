@@ -1098,6 +1098,13 @@ button{font-family:var(--font-body);}
     }
     viewStage.addEventListener("pointerup", endPointer);
     viewStage.addEventListener("pointercancel", endPointer);
+    viewStage.addEventListener("wheel", function(e){
+      e.preventDefault();
+      var factor = e.deltaY < 0 ? 1.15 : 1/1.15;
+      scale = Math.max(1, Math.min(4, scale * factor));
+      if(scale <= 1){ scale = 1; panX = 0; panY = 0; }
+      applyTransform();
+    }, {passive: false});
 
     function onKey(e){
       if(e.key === "ArrowLeft") go(-1);

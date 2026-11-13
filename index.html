@@ -1498,15 +1498,16 @@ button{font-family:var(--font-body);}
       '<div class="field"><label>Source</label><select id="fSource">' + sourceOptions(l.source) + '</select></div>' +
       '<div class="field"><label>Lien vers le mail original</label><input id="fMailLink" value="' + esc(l.mailLink) + '" placeholder="https://mail.google.com/..."></div>' +
       '<div id="mailLinkWrap"></div>' +
-      '<div class="field"><label>Étape</label><select id="fStage">' + stageOptions(l.stage) + '</select></div>' +
       '<div class="field"><label>Date du RDV</label><input type="datetime-local" id="fRdvDate" value="' + esc(l.rdvDate ? l.rdvDate.slice(0,16) : "") + '"></div>' +
       '<div id="gcalWrap"></div>' +
       '<div class="field"><label>Date d\'envoi du devis <span style="text-transform:none; font-weight:400;">(automatique, modifiable si besoin)</span></label><input type="date" id="fDevisEnvoyeDate" value="' + (l.devisEnvoyeDate ? toDateInputValue(l.devisEnvoyeDate) : "") + '"></div>';
     var notesBlock = '<div class="field"><label>Notes</label><textarea id="fNotes">' + esc(l.notes) + '</textarea></div>';
+    var stageBlock = '<div class="field"><label>Étape</label><select id="fStage">' + stageOptions(l.stage) + '</select></div>';
 
     modal.innerHTML = '<div id="formWrap">' +
       '<button class="modal-close" id="mClose" aria-label="Fermer">×</button>' +
       '<h2>Modifier le lead <span class="save-status" id="saveStatus"></span></h2>' +
+      stageBlock +
       nameBlock +
       (visitMode ? (crPhotoBlock + generalBlock + notesBlock) : (generalBlock + crPhotoBlock + notesBlock)) +
       (l.stage === "rdv_programme" ? '<button type="button" class="btn btn-primary" id="btnRdvDone" style="width:100%; justify-content:center;">✓ RDV terminé</button>' : '') +

@@ -1805,7 +1805,7 @@ button{font-family:var(--font-body);}
 
   function openNew(initialStage){
     var targetStage = initialStage || "nouveau";
-    var targetLabel = (COLUMNS.find(function(c){ return c.key === targetStage; }) || {}).label || "";
+    var targetLabel = targetStage === "nouveau" ? "" : ((COLUMNS.find(function(c){ return c.key === targetStage; }) || {}).label || "");
     overlay.hidden = false;
     modal.innerHTML = '<div id="formWrap">' +
       '<button class="modal-close" id="mClose" aria-label="Fermer">×</button>' +

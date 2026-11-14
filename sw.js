@@ -1,4 +1,4 @@
-var CACHE_NAME = "octopus-shell-v35";
+var CACHE_NAME = "octopus-shell-v36";
 var PRECACHE_URLS = [
   "./",
   "./index.html",

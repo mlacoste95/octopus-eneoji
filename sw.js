@@ -1,4 +1,4 @@
-var CACHE_NAME = "octopus-shell-v37"; // UX : espacement vertical accru entre les champs du formulaire lead
+var CACHE_NAME = "octopus-shell-v38"; // UX : fond hachuré rouge sur les devis en retard (J+20)
 var PRECACHE_URLS = [
   "./",
   "./index.html",

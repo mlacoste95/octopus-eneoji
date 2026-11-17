@@ -141,6 +141,9 @@ button{font-family:var(--font-body);}
   box-shadow:0 1px 2px rgba(0,0,0,0.04);
 }
 .card:hover{border-color:var(--accent);}
+.card.stale-relance{
+  background:repeating-linear-gradient(45deg, rgba(178,58,46,0.14) 0 6px, transparent 6px 12px), var(--surface);
+}
 .card.stale-warn{border-color:#C79A3E; border-width:1.5px;}
 .card.stale-urgent{border-color:#B23A2E; border-width:1.5px;}
 .stale-flag{font-size:0.72rem; font-weight:700;}
@@ -1270,8 +1273,11 @@ button{font-family:var(--font-body);}
             : (l.updatedAt ? (Date.now() - l.updatedAt) / 86400000 : 0);
           var isDevisStage = (l.stage === "devis_envoye" || l.stage === "devis_relance");
           var staleClass = "", staleFlag = "";
+          if(isDevisStage && staleDays >= 20){
+            staleClass = " stale-relance";
+          }
           if(isDevisStage && staleDays >= 40){
-            staleClass = " stale-urgent";
+            staleClass += " stale-urgent";
             staleFlag = '<div class="stale-flag urgent">⏰ Relance urgente</div>';
           }
           card.className = "card" + staleClass;
